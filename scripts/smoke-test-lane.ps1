@@ -3,7 +3,7 @@ param(
     [ValidateSet(
         "purpur-1.21.10-protectionstones-smoke",
         "purpur-26.2-protectionstones-smoke",
-        "folia-26.2-protectionstones-smoke"
+        "folia-26.1.2-protectionstones-smoke"
     )]
     [string] $Lane,
     [int] $TimeoutSeconds = 360

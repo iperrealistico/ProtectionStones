@@ -22,7 +22,7 @@ The active compatibility branch is
 | Lifecycle/config | `ProtectionStones`, `PSConfig`, `PSL` | startup, reload, integrations, TOML/YAML |
 | Region model | `PSRegion`, `PSStandardRegion`, `PSGroupRegion`, `PSMergedRegion` | stable public region API and WorldGuard metadata |
 | Placement/events | `BlockHandler`, `ListenerClass`, `FlagHandler` | claim lifecycle and configured behavior |
-| Commands | `PSCommand`, `commands/*` | upstream command and permission contract |
+| Commands | `PSCommand`, `commands/*`, `ArgAdminRemovePlayer` | command, permission, and global admin maintenance contract |
 | Economy | `PSEconomy`, `PSPlayer` | Vault rent, tax, buy, and sell behavior |
 | Scheduling | `scheduler/PlatformScheduler`, `TaskHandle` | Paper/Purpur/Folia execution boundary |
 | WorldGuard geometry | `WGUtils`, `WGMerge`, `RegionTraverse` | lookup, overlap, merge, and traversal |
@@ -45,10 +45,15 @@ The plugin continues to compile against WorldEdit 7.4.2 and WorldGuard 7.0.15
 APIs, the lowest selected common API surface. Newer runtime implementations are
 provided by the server lane and remain external to the plugin JAR.
 
+Global member/owner removal enters through the global scheduler, iterates
+WorldGuard managers for loaded worlds, mutates `PSRegion` domains, and saves
+each changed manager once. Completion messages return through the command
+sender's scheduler ownership. The operation never calls region deletion.
+
 ## Data Compatibility
 
-The fork does not introduce a new database, region flag, command namespace, or
-configuration schema. It retains:
+The fork does not introduce a new database, region flag, or persisted region
+schema. It retains:
 
 - `config.toml`
 - `blocks/*.toml`
@@ -56,6 +61,10 @@ configuration schema. It retains:
 - existing WorldGuard region IDs and ProtectionStones flags
 - owners, members, names, homes, rent, and tax metadata
 - public classes and custom event names
+
+The two new `/ps admin` subcommands add five message keys. Existing
+`messages.yml` values are preserved and missing defaults are appended by the
+normal message upgrade path.
 
 Reload parses block configuration into a new map and publishes it only after
 the complete snapshot is ready. Region-name indexes use concurrent maps and

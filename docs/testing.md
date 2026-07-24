@@ -2,15 +2,20 @@
 
 ## Automated
 
-Run on Java 21 and Java 25:
+Run `clean verify` on Java 21 and Java 25:
 
 ```powershell
 .\mvnw.cmd clean verify
 ```
 
-Tests cover rent-period parsing, numeric permission resolution, UUID cache
-concurrency, the shared particle-size range, metadata requirements, Java
-release policy, and forbidden scheduler/implementation imports.
+Produce and reproduce the release candidate with JDK 21. JDK 25 is a separate
+compile/test gate: different `javac` releases may emit byte-different Java 21
+class files, so its output must not replace the JDK-21-built candidate used by
+the runtime matrix.
+
+Tests cover rent parsing, numeric permission resolution, cache concurrency,
+particle ranges, command registration, non-destructive global domain removal,
+metadata, Java release policy, and forbidden scheduler/implementation imports.
 
 Compare a rebuilt upstream baseline against the candidate:
 
@@ -20,91 +25,81 @@ Compare a rebuilt upstream baseline against the candidate:
   -CandidateJar .\target\ProtectionStones-2.10.6-pvc.1.jar
 ```
 
-The API check compares public/protected classes and JVM member descriptors, so
-it detects binary API removals without treating non-binary implementation
-modifiers such as `volatile` as breaks.
+The API check compares public/protected classes and JVM member descriptors.
 
 ## Runtime Roots
 
-The isolated roots are:
+The required isolated roots are:
 
 ```text
 local-servers/purpur-1.21.10-protectionstones-smoke
 local-servers/purpur-26.2-protectionstones-smoke
-local-servers/folia-1.21.10-protectionstones-smoke
-local-servers/folia-26.2-protectionstones-smoke
+local-servers/folia-26.1.2-protectionstones-smoke
 local-servers/purpur-1.21.10-protectionstones-upstream-migration
 ```
 
-Each root must contain `server.jar`, `plugins/`, `eula.txt`, a lane manifest,
-startup/shutdown logs, and no production data.
+Provision the three release lanes with exact dependency and server hashes:
 
-## Core Sheet
+```powershell
+.\scripts\provision-test-matrix.ps1 -AcceptEula
+```
 
-Run and record on all four lanes:
+Folia 26.1.2 build 8 was the latest official Folia binary on 2026-07-24.
+Resolve “latest” again before a later release.
 
-- C-01 clean startup and plugin enable
-- C-02 obtain and place a protection block
-- C-03 verify bounds, owner, type, home, and default flags
-- C-04 add/remove member and owner
-- C-05 edit and restore flags
-- C-06 hide and unhide
-- C-07 break and remote/local unclaim
-- C-08 set home, immediate/delayed/cancelled teleport
-- C-09 view particles
-- C-10 priority, parent, and merge
-- C-11 piston, explosion, liquid, fire, and wind-charge behavior
-- C-12 `/ps reload`
-- C-13 restart and persistence
-- C-14 clean stop with no task warning
-- C-15 log scan for thread, scheduler, dependency, and exception failures
+## Runtime Sheets
 
-## Integration Sheet
+Run on all three release lanes:
+
+- C-01 startup, enable, reload, and clean stop
+- C-02 physical placement, metadata, and physical break
+- C-03 members, owners, flags, name, priority, parent, and merge
+- C-04 home plus immediate, delayed, and cancelled teleport
+- C-05 `/ps view` and tracked particle generation
+- C-06 piston, explosion, liquid, fire, wind-charge, and related protections
+- C-07 public API, configured actions, and custom events
+- C-08 restart, persistence, remote unclaim, and fatal-log scan
+- C-09 global member/owner removal, admin permission, UUID input, unchanged
+  region existence, ownerless persistence, and multi-world save
 
 Run on at least one Purpur and one Folia lane:
 
-- I-01 Vault economy buy/sell/rent/tax
+- I-01 Vault buy, sell, rent, and tax
 - I-02 PlaceholderAPI values
 - I-03 LuckPerms-derived limits
 - I-04 offline-player and UUID resolution
 - I-05 cleanup preview/remove and maintenance commands
-- I-06 configured create/remove actions
-- I-07 public API and custom-event listener
-- I-08 copied upstream configuration and region-data restart
+- I-06 copied upstream configuration and region-data migration
 
-All lanes must use a byte-for-byte identical final JAR. Record `Get-FileHash
--Algorithm SHA256` before each startup.
+All runtime invocations must assert the same candidate SHA-256 recorded in the
+lane manifest.
 
-I-01 through I-07 pass on Purpur 1.21.10 and Folia 26.2. I-08 passes in the
-dedicated Purpur 1.21.10 migration root after an upstream-create phase and two
-candidate verification restarts.
+## Mineflayer Harness
 
-## Automated Player Harness
+Install the locked Node dependencies in `test-harness/mineflayer`, then use:
 
-The current local harness uses Mineflayer `4.34.0` with two offline-mode
-players. It verifies physical acquisition/placement, exact region metadata,
-members, owners, flags, name, priority, home, hide/unhide, parent, merge,
-reload, real restart, persistence, remote unclaim, and physical break. Separate
-runners verify delayed/movement-cancelled teleport, the runtime probe sheet,
-optional integrations, and upstream-data migration.
+```powershell
+.\run-core-flow.ps1 ...
+.\run-teleport-flow.ps1 ...
+.\run-probe-flow.ps1 ...
+.\run-admin-domain-flow.ps1 ...
+.\run-integration-flow.ps1 ...
+.\run-migration-flow.ps1 ...
+```
 
-For `26.2` only, the isolated test roots use ViaVersion and ViaBackwards
-`5.11.0` to translate the pinned `1.21.10` test client. These are test transport
-dependencies and are neither bundled with nor required by ProtectionStones.
+The admin-domain runner creates regions in Overworld and Nether, denies a
+non-admin, removes a cached name and literal UUID globally, leaves both regions
+present with no owners, restarts the server, and verifies persisted domains.
 
-Mineflayer cannot reliably parse the `1.21.10` particle packet emitted by
-`/ps view`. The Java 21 runtime probe therefore invokes the real command as the
-player and requires a non-zero ProtectionStones tracked particle-task count in
-the server log. All three runnable lanes report 9,390 tasks, closing C-09
-without treating client decoder failure as server success.
+The runtime probe invokes the real `/ps view` command and requires a non-zero
+tracked particle-task count. Mineflayer's particle decoder limitation is not
+treated as a server pass by itself.
 
-The integration runner uses a local-only Vault economy and a Java 21 probe. It
-tests exact balance transitions for sale, rent, and tax, active placeholders,
-LuckPerms claim denial, offline owner add/remove, and asynchronous cleanup. It
-restores `config.toml` and `block1.toml` byte-for-byte in `finally`.
+The integration runner restores temporary tax and block configuration
+byte-for-byte in `finally`. The migration runner creates data with unmodified
+upstream 2.10.6, preserves TOML and every existing message entry, permits only
+the five additive admin command messages, and checks semantic region data
+through two candidate restarts.
 
-The migration runner creates data with upstream commit
-`89be4aeab1f00422ad060e797660e56f32e1aaf0`, swaps in the candidate, and
-verifies the same data twice. It requires unchanged hashes for all upstream
-ProtectionStones TOML/YAML files and semantic persistence of WorldGuard region
-metadata.
+ViaVersion and ViaBackwards in the 26.x roots are test-client transport only.
+No harness targets production.

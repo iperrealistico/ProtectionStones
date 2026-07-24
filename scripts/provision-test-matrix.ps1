@@ -24,7 +24,8 @@ $userAgent = "ProtectionStones-PVC-test-matrix/2.10.6-pvc.1"
 function Get-PinnedFile {
     param(
         [string] $Name,
-        [string] $Url
+        [string] $Url,
+        [string] $ExpectedSha256 = ""
     )
 
     $path = Join-Path $cacheRoot $Name
@@ -32,32 +33,43 @@ function Get-PinnedFile {
         Write-Host "Downloading $Name"
         Invoke-WebRequest -Uri $Url -OutFile $path -Headers @{ "User-Agent" = $userAgent } -UseBasicParsing
     }
+    if ($ExpectedSha256) {
+        $actualSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash
+        if ($actualSha256 -ne $ExpectedSha256) {
+            throw "$Name has SHA-256 $actualSha256, expected $ExpectedSha256"
+        }
+    }
     return $path
 }
 
 $worldEdit12110 = Get-PinnedFile `
     -Name "worldedit-bukkit-7.4.2.jar" `
-    -Url "https://cdn.modrinth.com/data/1u6JkXh5/versions/p8T2aZ8U/worldedit-bukkit-7.4.2.jar"
+    -Url "https://cdn.modrinth.com/data/1u6JkXh5/versions/p8T2aZ8U/worldedit-bukkit-7.4.2.jar" `
+    -ExpectedSha256 "0EE152B1BE5DFB51500505E2BF5A8C9D66F09C7FA484BF9AEA384D7E7B459B06"
 $worldGuard12110 = Get-PinnedFile `
     -Name "worldguard-bukkit-7.0.15-SNAPSHOT-dist.jar" `
-    -Url "https://github.com/Inquisitors-transfers/WorldGuard-Folia/releases/download/2026-02-02/worldguard-bukkit-7.0.15-SNAPSHOT-dist.jar"
+    -Url "https://github.com/Inquisitors-transfers/WorldGuard-Folia/releases/download/2026-02-02/worldguard-bukkit-7.0.15-SNAPSHOT-dist.jar" `
+    -ExpectedSha256 "0EE453113F45AD4129852FA9334789CC6A1F4700BE3FF9396F11FFC6787E02E1"
 $worldEdit262 = Get-PinnedFile `
     -Name "worldedit-bukkit-7.4.4.jar" `
-    -Url "https://cdn.modrinth.com/data/1u6JkXh5/versions/qNuPcliz/worldedit-bukkit-7.4.4.jar"
+    -Url "https://cdn.modrinth.com/data/1u6JkXh5/versions/qNuPcliz/worldedit-bukkit-7.4.4.jar" `
+    -ExpectedSha256 "44C97EE6C1DF9AFA127DF3C5A2C6A7108F826FB44AB7B255A7EC4250FEB89B9D"
 $worldGuard262 = Get-PinnedFile `
     -Name "worldguard-bukkit-7.0.17.jar" `
-    -Url "https://cdn.modrinth.com/data/DKY9btbd/versions/pI4UHLJL/worldguard-bukkit-7.0.17.jar"
+    -Url "https://cdn.modrinth.com/data/DKY9btbd/versions/pI4UHLJL/worldguard-bukkit-7.0.17.jar" `
+    -ExpectedSha256 "3F14562509BF01E7680571B6F56932239157FF938F257C3226DF3B4088AE54F2"
 $purpur12110 = Get-PinnedFile `
     -Name "purpur-1.21.10-2535.jar" `
-    -Url "https://api.purpurmc.org/v2/purpur/1.21.10/2535/download"
+    -Url "https://api.purpurmc.org/v2/purpur/1.21.10/2535/download" `
+    -ExpectedSha256 "4159783677B08B6395782E6150CB28646C70ED988B7948C09E01AA5A5E90F548"
 $purpur262 = Get-PinnedFile `
     -Name "purpur-26.2-2614.jar" `
-    -Url "https://api.purpurmc.org/v2/purpur/26.2/2614/download"
-
-$folia262 = Join-Path $serversRoot ".sources/folia-26.2/folia-server/build/libs/folia-paperclip-26.2.local-SNAPSHOT.jar"
-if (-not (Test-Path -LiteralPath $folia262 -PathType Leaf)) {
-    throw "Folia 26.2 source-built Paperclip is missing: $folia262"
-}
+    -Url "https://api.purpurmc.org/v2/purpur/26.2/2614/download" `
+    -ExpectedSha256 "27189194D00B93BDF94045F08423D6E3D55D89DE3519E6548FB5A56CA99DCEA7"
+$folia2612 = Get-PinnedFile `
+    -Name "folia-26.1.2-8.jar" `
+    -Url "https://fill-data.papermc.io/v1/objects/607afd1c3320008e1ffd2eaee6780ace4419d5f8c527b75e79f259be79ebf57b/folia-26.1.2-8.jar" `
+    -ExpectedSha256 "607AFD1C3320008E1FFD2EAEE6780ACE4419D5F8C527B75E79F259BE79EBF57B"
 
 $lanes = @(
     @{
@@ -77,11 +89,11 @@ $lanes = @(
         Dependencies = @($worldEdit262, $worldGuard262)
     },
     @{
-        Name = "folia-26.2-protectionstones-smoke"
-        Port = 25584
+        Name = "folia-26.1.2-protectionstones-smoke"
+        Port = 25583
         Java = 25
-        Server = $folia262
-        ServerId = "Folia 26.2 source commit 602048cb815db2ded68cca8cd43f480b983185a1"
+        Server = $folia2612
+        ServerId = "Folia 26.1.2 build 8"
         Dependencies = @($worldEdit262, $worldGuard262)
     }
 )
@@ -141,22 +153,4 @@ foreach ($lane in $lanes) {
         Set-Content -LiteralPath (Join-Path $root "lane-manifest.json") -Encoding utf8
 }
 
-$blockedRoot = Join-Path $serversRoot "folia-1.21.10-protectionstones-smoke"
-New-Item -ItemType Directory -Force -Path $blockedRoot | Out-Null
-@'
-# BLOCKED: no Folia 1.21.10 runtime
-
-PaperMC's Folia project has no published 1.21.10 build and no `ver/1.21.10`
-source branch. The official Fill catalog omits 1.21.10, and a direct version
-query returns null. In source history, commit e1120c1436f9a4a0f849a22ec8c62c7a1e02b74c
-still declares mcVersion=1.21.8; its direct child
-8bfaa08bec8dfc0b55ab78b82b56dde20d3f55ba declares mcVersion=1.21.11.
-
-Neither adjacent version nor a locally invented server port is an acceptable
-substitute for the exact required lane.
-
-Checked: 2026-07-24
-'@ | Set-Content -LiteralPath (Join-Path $blockedRoot "BLOCKED.md") -Encoding utf8
-
-Write-Host "Provisioned three runnable lanes under $serversRoot"
-Write-Warning "Folia 1.21.10 remains blocked because no exact server implementation exists."
+Write-Host "Provisioned the three required release lanes under $serversRoot"

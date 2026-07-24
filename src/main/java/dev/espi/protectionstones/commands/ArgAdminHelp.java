@@ -131,6 +131,20 @@ public class ArgAdminHelp {
                 false);
 
         send(p,
+                tx + " admin removemember",
+                "Remove a player as member from every ProtectionStones region in every loaded world without deleting any region.\n\n" +
+                        bc + " admin removemember [playername|uuid]",
+                bc + " admin removemember",
+                false);
+
+        send(p,
+                tx + " admin removeowner",
+                "Remove a player as owner from every ProtectionStones region in every loaded world without deleting any region.\n\n" +
+                        bc + " admin removeowner [playername|uuid]",
+                bc + " admin removeowner",
+                false);
+
+        send(p,
                 tx + " admin forcemerge",
                 "Merge overlapping PS regions together if they have the same owners, members and flags.\n\n" +
                         bc + " admin forcemerge [world]",

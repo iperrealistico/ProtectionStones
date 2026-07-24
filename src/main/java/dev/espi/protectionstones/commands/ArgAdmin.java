@@ -58,6 +58,16 @@ public class ArgAdmin implements PSCommandArg {
                 " admin forcemerge [world]";
     }
 
+    public static String getRemoveMemberHelp() {
+        return ChatColor.AQUA + "> " + ChatColor.GRAY + "/" + ProtectionStones.getInstance().getConfigOptions().base_command +
+                " admin removemember [playername|uuid]";
+    }
+
+    public static String getRemoveOwnerHelp() {
+        return ChatColor.AQUA + "> " + ChatColor.GRAY + "/" + ProtectionStones.getInstance().getConfigOptions().base_command +
+                " admin removeowner [playername|uuid]";
+    }
+
     @Override
     public List<String> getNames() {
         return Collections.singletonList("admin");
@@ -123,6 +133,18 @@ public class ArgAdmin implements PSCommandArg {
                 return ArgAdminForceMerge.argumentAdminForceMerge(s, args);
             case "settaxautopayers":
                 return ArgAdminSetTaxAutopayers.argumentAdminSetTaxAutopayers(s, args);
+            case "removemember":
+                return ArgAdminRemovePlayer.argumentAdminRemovePlayer(
+                        s,
+                        args,
+                        ArgAdminRemovePlayer.DomainRole.MEMBER
+                );
+            case "removeowner":
+                return ArgAdminRemovePlayer.argumentAdminRemovePlayer(
+                        s,
+                        args,
+                        ArgAdminRemovePlayer.DomainRole.OWNER
+                );
             case "fixregions":
                 s.sendMessage(ChatColor.YELLOW + "Fixing...");
                 LegacyUpgrade.upgradeRegions();
@@ -143,7 +165,7 @@ public class ArgAdmin implements PSCommandArg {
     @Override
     public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
         if (args.length == 2) {
-            List<String> arg = Arrays.asList("version", "hide", "unhide", "cleanup", "stats", "lastlogon", "lastlogons", "flag", "recreate", "fixregions", "debug", "forcemerge", "changeblock", "changeregiontype", "settaxautopayers");
+            List<String> arg = Arrays.asList("version", "hide", "unhide", "cleanup", "stats", "lastlogon", "lastlogons", "flag", "recreate", "fixregions", "debug", "forcemerge", "changeblock", "changeregiontype", "settaxautopayers", "removemember", "removeowner");
             return StringUtil.copyPartialMatches(args[1], arg, new ArrayList<>());
         } else if (args.length >= 3 && args[1].equals("forcemerge")) {
             return ArgAdminForceMerge.tabComplete(sender, alias, args);

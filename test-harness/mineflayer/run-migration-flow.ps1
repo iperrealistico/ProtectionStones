@@ -196,6 +196,36 @@ function Get-PluginDataHashes {
     return $result
 }
 
+function Get-MessagesCompatibilityHash {
+    $messagesPath = Join-Path $pluginsRoot "ProtectionStones/messages.yml"
+    $messages = [System.IO.File]::ReadAllText($messagesPath)
+    $newMessagesPattern = (
+        "(?ms)^  remove_player_started:.*?" +
+        "^reload:"
+    )
+    $matches = [regex]::Matches($messages, $newMessagesPattern)
+    if ($matches.Count -ne 1) {
+        throw "Expected exactly one additive admin remove-player message block"
+    }
+
+    $withoutNewMessages = [regex]::Replace(
+        $messages,
+        $newMessagesPattern,
+        "reload:"
+    )
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes(
+            $withoutNewMessages
+        )
+        return ([System.BitConverter]::ToString(
+            $sha256.ComputeHash($bytes)
+        )).Replace("-", "")
+    } finally {
+        $sha256.Dispose()
+    }
+}
+
 Invoke-MigrationPhase -Mode create -Phase "upstream-create"
 $baselineDataHashes = Get-PluginDataHashes
 $baselineDataHashes | ConvertTo-Json |
@@ -206,6 +236,11 @@ $baselineDataHashes | ConvertTo-Json |
 New-Item -ItemType Directory -Force -Path (
     Join-Path $serverRoot "source-artifacts"
 ) | Out-Null
+Copy-Item -LiteralPath (
+    Join-Path $pluginsRoot "ProtectionStones/messages.yml"
+) -Destination (
+    Join-Path $serverRoot "source-artifacts/messages-upstream.yml"
+)
 Move-Item -LiteralPath $activePlugin -Destination (
     Join-Path $serverRoot "source-artifacts/ProtectionStones-upstream-2.10.6.jar"
 )
@@ -213,14 +248,35 @@ Copy-Item -LiteralPath $candidateJar -Destination $activePlugin
 
 Invoke-MigrationPhase -Mode verify -Phase "candidate-verify-1"
 $firstCandidateDataHashes = Get-PluginDataHashes
+$firstMessagesCompatibilityHash = Get-MessagesCompatibilityHash
 Invoke-MigrationPhase -Mode verify -Phase "candidate-verify-2"
 $secondCandidateDataHashes = Get-PluginDataHashes
+$secondMessagesCompatibilityHash = Get-MessagesCompatibilityHash
 
-$baselineJson = $baselineDataHashes | ConvertTo-Json -Compress
-$firstJson = $firstCandidateDataHashes | ConvertTo-Json -Compress
-$secondJson = $secondCandidateDataHashes | ConvertTo-Json -Compress
-if ($firstJson -ne $baselineJson -or $secondJson -ne $baselineJson) {
-    throw "Candidate changed upstream ProtectionStones TOML/YAML data"
+foreach ($path in $baselineDataHashes.Keys) {
+    if ($path -eq "messages.yml") {
+        continue
+    }
+    if (
+        $firstCandidateDataHashes[$path] -ne $baselineDataHashes[$path] -or
+        $secondCandidateDataHashes[$path] -ne $baselineDataHashes[$path]
+    ) {
+        throw "Candidate changed upstream ProtectionStones data: $path"
+    }
+}
+
+$baselineMessagesHash = $baselineDataHashes["messages.yml"]
+if (
+    $firstMessagesCompatibilityHash -ne $baselineMessagesHash -or
+    $secondMessagesCompatibilityHash -ne $baselineMessagesHash
+) {
+    throw "Candidate changed existing upstream messages.yml entries"
+}
+if (
+    $firstCandidateDataHashes["messages.yml"] -ne
+    $secondCandidateDataHashes["messages.yml"]
+) {
+    throw "Candidate messages.yml migration is not stable across restarts"
 }
 
 $fatalPatterns = @(
@@ -252,7 +308,17 @@ $manifest = [ordered]@{
     java = 21
     port = $Port
     phases = @("upstream-create", "candidate-verify-1", "candidate-verify-2")
-    plugin_data_hashes_unchanged = $true
+    toml_hashes_unchanged = $true
+    messages_existing_entries_unchanged = $true
+    messages_added = @(
+        "admin.remove_player_started",
+        "admin.remove_player_complete",
+        "admin.remove_player_none",
+        "admin.remove_player_save_failed",
+        "admin.remove_player_failed"
+    )
+    upstream_messages_sha256 = $baselineMessagesHash
+    migrated_messages_sha256 = $secondCandidateDataHashes["messages.yml"]
 }
 $manifest | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (
@@ -261,5 +327,6 @@ $manifest | ConvertTo-Json -Depth 4 |
 
 Write-Host (
     "PASS: upstream data migrated twice; upstream=$upstreamHash; " +
-    "candidate=$candidateHash; plugin-data-files=$($baselineDataHashes.Count)"
+    "candidate=$candidateHash; existing-data-preserved=true; " +
+    "additive-messages=5"
 )

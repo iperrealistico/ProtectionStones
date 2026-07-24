@@ -11,6 +11,11 @@ All scheduling enters through `PlatformScheduler`.
 | Player messages, GUI, particles, countdowns | Entity |
 | Profile cache writes and file-only report output | Async |
 
+`/ps admin removemember` and `/ps admin removeowner` perform their complete
+loaded-world scan and WorldGuard save on the global scheduler. Player command
+responses and tenant notifications are handed back to the owning entity
+scheduler; console responses use the global scheduler.
+
 The location used for region scheduling is calculated from the ProtectionStones
 region ID through `PSRegion.getProtectBlockLocation()`. Code must not read a
 world block merely to discover the scheduler location.
@@ -47,5 +52,5 @@ The following are forbidden outside the scheduler package:
 - synchronous player teleport
 
 Any upstream change involving world access, commands, WorldGuard mutation,
-teleport, caches, or callbacks requires a new ownership review and all four
-runtime lanes.
+teleport, caches, or callbacks requires a new ownership review and all three
+required runtime lanes.

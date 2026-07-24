@@ -459,10 +459,12 @@ public class PSStandardRegion extends PSRegion {
             if (getRentStage() == RentStage.LOOKING_FOR_TENANT || getRentStage() == RentStage.RENTING) {
 
                 if (getTenant() != null) {
-                    PSPlayer tenant = PSPlayer.fromUUID(getTenant());
-                    if (tenant.getOfflinePlayer().isOnline()) {
-                        PSL.msg(Bukkit.getPlayer(getTenant()), PSL.RENT_TENANT_STOPPED_TENANT.msg()
-                                .replace("%region%", getName() != null ? getName() : getId()));
+                    Player tenant = Bukkit.getPlayer(getTenant());
+                    if (tenant != null) {
+                        String message = PSL.RENT_TENANT_STOPPED_TENANT.msg()
+                                .replace("%region%", getName() != null ? getName() : getId());
+                        ProtectionStones.getInstance().getTaskScheduler()
+                                .runEntity(tenant, () -> PSL.msg(tenant, message));
                     }
                 }
 

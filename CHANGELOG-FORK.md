@@ -1,6 +1,6 @@
 # Fork Changelog
 
-## 2.10.6-pvc.1 - Unreleased
+## 2.10.6-pvc.1 - 2026-07-24
 
 Base: upstream ProtectionStones `2.10.6` at
 `89be4aeab1f00422ad060e797660e56f32e1aaf0`.
@@ -18,6 +18,19 @@ Base: upstream ProtectionStones `2.10.6` at
   reload or disable as applicable.
 - Cap the purple `/ps view` dust marker at the shared Paper API maximum so the
   same visual command executes on both 1.21.10 and 26.2.
+- Validate the same Java 21 artifact on Purpur 1.21.10, Purpur 26.2, and the
+  latest official Folia available at release time (26.1.2 build 8).
+
+### Administration
+
+- Add admin-only `/ps admin removemember <playername|uuid>` to remove one UUID
+  from every ProtectionStones member domain across loaded worlds.
+- Add admin-only `/ps admin removeowner <playername|uuid>` with the equivalent
+  owner-domain behavior.
+- Preserve every affected region, including regions left with no owners, and
+  persist each changed WorldGuard manager.
+- Add configurable progress, completion, no-match, save-failure, and failure
+  messages.
 
 ### Concurrency
 
@@ -37,15 +50,16 @@ Base: upstream ProtectionStones `2.10.6` at
 ### Verification
 
 - Pass the complete physical core, restart, teleport, environment, API/event,
-  configured-action, and region-view sheets on all three runnable lanes.
+  configured-action, region-view, and global admin-domain sheets on all three
+  required lanes.
 - Pass Vault, PlaceholderAPI, LuckPerms, offline UUID, and cleanup integrations
-  on representative Purpur 1.21.10 and Folia 26.2 lanes.
+  on representative Purpur 1.21.10 and latest-Folia lanes.
 - Load a real upstream 2.10.6 configuration and WorldGuard region dataset
-  through two candidate restarts without changing upstream TOML/YAML files or
-  losing region metadata.
+  through two candidate restarts without changing TOML files, existing message
+  entries, or region metadata. Only the five new command-message keys are
+  added.
 
 ### Compatibility Status
 
-No release is final until every lane in
-`docs/compatibility-matrix.md` is marked `PASS` with the same JAR checksum.
-Exact Folia 1.21.10 remains unavailable and therefore blocks release.
+All required lanes in `docs/compatibility-matrix.md` passed with JAR SHA-256
+`F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE`.

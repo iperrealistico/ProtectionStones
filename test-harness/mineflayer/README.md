@@ -25,7 +25,7 @@ Run one lane from this directory:
   -JavaExe C:\path\to\java.exe `
   -Port 25581 `
   -BaseX 1000 `
-  -ExpectedCandidateSha256 4E002C5A8A42C955803C7532C2EF4D4F524655D3806523997E9083A065E06E50
+  -ExpectedCandidateSha256 F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE
 ```
 
 The runner performs a create phase, stops the server, starts a verify phase,
@@ -40,7 +40,7 @@ Delayed and movement-cancelled teleports use a separate runner:
   -JavaExe C:\path\to\java.exe `
   -Port 25581 `
   -BaseX 1500 `
-  -ExpectedCandidateSha256 4E002C5A8A42C955803C7532C2EF4D4F524655D3806523997E9083A065E06E50
+  -ExpectedCandidateSha256 F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE
 ```
 
 This runner requires LuckPerms in the isolated lane. It temporarily sets the
@@ -58,7 +58,7 @@ particle-task generation:
   -JavaExe C:\path\to\java.exe `
   -Port 25581 `
   -BaseX 1600 `
-  -ExpectedCandidateSha256 4E002C5A8A42C955803C7532C2EF4D4F524655D3806523997E9083A065E06E50
+  -ExpectedCandidateSha256 F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE
 ```
 
 Build `../runtime-probe` first. The runner installs that test-only JAR into the
@@ -69,6 +69,22 @@ Mineflayer's known particle decoder limitation is tolerated only after the
 view assertion is requested. The server log must still report a successful
 real command dispatch and a non-zero tracked particle-task count.
 
+Global admin member/owner removal uses its own two-phase runner:
+
+```powershell
+.\run-admin-domain-flow.ps1 `
+  -Lane purpur-1.21.10-protectionstones-smoke `
+  -JavaExe C:\path\to\java.exe `
+  -Port 25581 `
+  -BaseX 1700 `
+  -BaseZ 1700 `
+  -ExpectedCandidateSha256 F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE
+```
+
+It verifies admin-only access, Overworld and Nether scans, name and UUID
+targets, member and owner domains, ownerless-region preservation, real
+restart, persistence, and fatal-log patterns.
+
 The integration runner verifies real sale, purchase, rent, tax,
 PlaceholderAPI, LuckPerms limit, offline UUID, and admin cleanup behavior:
 
@@ -78,7 +94,7 @@ PlaceholderAPI, LuckPerms limit, offline UUID, and admin cleanup behavior:
   -JavaExe C:\path\to\java.exe `
   -Port 25581 `
   -BaseX 5000 `
-  -ExpectedCandidateSha256 4E002C5A8A42C955803C7532C2EF4D4F524655D3806523997E9083A065E06E50
+  -ExpectedCandidateSha256 F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE
 ```
 
 Build `../test-vault` and `../integration-probe` first. The runner restores
@@ -94,9 +110,14 @@ before running it:
 ```powershell
 .\run-migration-flow.ps1 `
   -JavaExe C:\path\to\java.exe `
-  -ExpectedCandidateSha256 4E002C5A8A42C955803C7532C2EF4D4F524655D3806523997E9083A065E06E50
+  -ExpectedCandidateSha256 F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE
 ```
 
-For `26.2`, the isolated lane may include pinned ViaVersion and ViaBackwards so
-the fixed `1.21.10` Mineflayer protocol can reach the server. Those plugins are
-test transport only and are not ProtectionStones dependencies.
+The migration gate requires byte-identical TOML, unchanged existing message
+entries, exactly five additive admin-command messages, and stable output over
+two candidate restarts.
+
+For 26.x runtime lanes, the isolated root may include pinned ViaVersion and
+ViaBackwards so the fixed 1.21.10 Mineflayer protocol can reach the server.
+Those plugins are test transport only and are not ProtectionStones
+dependencies.

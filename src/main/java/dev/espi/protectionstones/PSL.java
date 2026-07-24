@@ -309,6 +309,11 @@ public enum PSL {
     ADMIN_LASTLOGONS_HEADER("admin.lastlogons_header", ChatColor.YELLOW + "%days% Days Plus:\n================"),
     ADMIN_LASTLOGONS_LINE("admin.lastlogons_line", ChatColor.YELLOW + "%player% %time% days"),
     ADMIN_LASTLOGONS_FOOTER("admin.lastlogons_footer", ChatColor.YELLOW + "================\n%count% Total Players Shown\n%checked% Total Players Checked"),
+    ADMIN_REMOVE_PLAYER_STARTED("admin.remove_player_started", ChatColor.GRAY + "Removing %player% as %role% from all ProtectionStones regions..."),
+    ADMIN_REMOVE_PLAYER_COMPLETE("admin.remove_player_complete", ChatColor.GREEN + "Removed %player% as %role% from %count% ProtectionStones region(s)."),
+    ADMIN_REMOVE_PLAYER_NONE("admin.remove_player_none", ChatColor.GRAY + "%player% is not listed as %role% in any ProtectionStones region."),
+    ADMIN_REMOVE_PLAYER_SAVE_FAILED("admin.remove_player_save_failed", ChatColor.RED + "Removed %player% as %role% from %count% region(s), but could not save world(s): %worlds%. Check the server log."),
+    ADMIN_REMOVE_PLAYER_FAILED("admin.remove_player_failed", ChatColor.RED + "Could not complete removal of %player% as %role%. Check the server log."),
 
     // ps reload
     RELOAD_HELP("reload.help", ChatColor.AQUA + "> " + ChatColor.GRAY + "/ps reload"),
@@ -512,6 +517,10 @@ public enum PSL {
             yml.set(psl.path, psl.defaultMessage);
         } else if (psl == PSL.REACHED_PER_BLOCK_REGION_LIMIT && value.equals("&cYou can not create any more regions of this type.")) {
             yml.set(psl.path, psl.defaultMessage);
+        } else if (psl == PSL.ADMIN_REMOVE_PLAYER_NONE
+                && value.equals(applyConfigColours(ChatColor.GRAY
+                + "%player% is not a %role% of any ProtectionStones region."))) {
+            yml.set(psl.path, applyConfigColours(psl.defaultMessage));
         } else if (value.contains("§")) {
             yml.set(psl.path, applyConfigColours(value));
         }

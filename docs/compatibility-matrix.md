@@ -4,95 +4,56 @@ Status date: 2026-07-24
 
 Candidate: `ProtectionStones-2.10.6-pvc.1.jar`
 
-Current candidate SHA-256:
-`4E002C5A8A42C955803C7532C2EF4D4F524655D3806523997E9083A065E06E50`
+SHA-256:
+`F9DF17E6545880A32B23B4A7CD19264603A3A7B0E1FFEF1C2087AE318C36FBFE`
 
-No lane is a release pass until it records the same candidate SHA-256 and a
-completed core test sheet.
+All rows below used this byte-for-byte identical Java 21 artifact.
 
-| Lane | Server source/build | Java | WorldEdit | WorldGuard | Status |
+| Lane | Server | Java | WorldEdit | WorldGuard | Result |
 | --- | --- | --- | --- | --- | --- |
-| Purpur 1.21.10 | Purpur build 2535 | 21 | 7.4.2 | WorldGuard-Folia 7.0.15 snapshot, 2026-02-02 | AVAILABLE CORE PASS; REPRESENTATIVE INTEGRATIONS PASS |
-| Purpur 26.2 | Purpur build 2614 | 25 | 7.4.4 | 7.0.17 | AVAILABLE CORE PASS |
-| Folia 1.21.10 | No official PaperMC Folia build or source line exists | 21 | 7.4.2 | WorldGuard-Folia 7.0.15 snapshot, 2026-02-02 | BLOCKED |
-| Folia 26.2 | Source commit `602048cb815db2ded68cca8cd43f480b983185a1` | 25 | 7.4.4 | 7.0.17 | AVAILABLE CORE PASS; REPRESENTATIVE INTEGRATIONS PASS |
+| Purpur 1.21.10 | build 2535 | 21 | 7.4.2 | WorldGuard-Folia 7.0.15 snapshot, 2026-02-02 | PASS |
+| Purpur 26.2 | build 2614 | 25 | 7.4.4 | 7.0.17 | PASS |
+| Latest official Folia | 26.1.2 build 8 | 25 | 7.4.4 | 7.0.17 | PASS |
 
-## Dependency Sources
+At validation time, 26.1.2 build 8 was the newest binary published on the
+official [PaperMC Folia downloads page](https://papermc.io/downloads/folia).
+“Latest Folia” is a moving target: re-resolve and rerun this matrix before each
+future release rather than extending this result to a newer build.
 
-- WorldEdit 7.4.2:
-  `https://cdn.modrinth.com/data/1u6JkXh5/versions/p8T2aZ8U/worldedit-bukkit-7.4.2.jar`
-- WorldEdit 7.4.4:
-  `https://cdn.modrinth.com/data/1u6JkXh5/versions/qNuPcliz/worldedit-bukkit-7.4.4.jar`
-- WorldGuard-Folia 7.0.15 snapshot:
-  `https://github.com/Inquisitors-transfers/WorldGuard-Folia/releases/download/2026-02-02/worldguard-bukkit-7.0.15-SNAPSHOT-dist.jar`
-- WorldGuard 7.0.17:
-  `https://cdn.modrinth.com/data/DKY9btbd/versions/pI4UHLJL/worldguard-bukkit-7.0.17.jar`
+## Runtime Coverage
 
-Representative integration dependencies:
+Every lane passed:
 
-- LuckPerms Bukkit 5.5.65, SHA-256
-  `8B842D9D95C3F3C056E471214D156C0D3D704A46CBDD1A04A9BC47281D54B8A3`.
-- PlaceholderAPI 2.12.2 on Purpur 1.21.10, SHA-256
-  `FF76AF20C7ACF327FF2A28FB2DBD6694E3F946503E72635A5F7B6CB2E64FC014`.
-- Unmodified PlaceholderAPI commit
-  `7d21d2f1d73f045b86812c70e6c6975b102c6d89` on the locally source-built
-  Folia 26.2 lane, version `2.12.4-DEV-7d21d2f`, SHA-256
-  `B1B706DD708A745A4C9F4A3BCF591684D6055FF8AAAC1145B19F2113C2E237B2`.
+- enable, `/ps reload`, clean stop, and fatal-log scan
+- physical claim creation and break
+- member, owner, flag, name, priority, home, hide, parent, and merge flows
+- delayed and movement-cancelled teleport
+- public API, custom events, configured actions, environmental protections,
+  and `/ps view`
+- `/ps admin removemember` and `/ps admin removeowner` across Overworld and
+  Nether, including permission denial, UUID input, ownerless-region
+  preservation, save, restart, and persistence
 
-PlaceholderAPI 2.12.2 cannot parse the non-release server version string
-`26.2.local-SNAPSHOT`. The pinned official source commit uses its newer server
-version resolver and loads without modification. This is a test-environment
-metadata issue, not a ProtectionStones runtime patch.
+Purpur 1.21.10 and latest Folia also passed representative Vault,
+PlaceholderAPI, LuckPerms, offline-player, tax, rent, and cleanup integrations.
+An upstream 2.10.6 migration passed two candidate restarts.
 
-The missing Folia 1.21.10 runtime is a release blocker. Folia history updates
-directly from 1.21.8 to 1.21.11, so substituting either version would not prove
-the requested lane.
+## Pinned Checksums
 
-### Folia 1.21.10 blocker evidence
+| Artifact | SHA-256 |
+| --- | --- |
+| Purpur 1.21.10 build 2535 | `4159783677B08B6395782E6150CB28646C70ED988B7948C09E01AA5A5E90F548` |
+| Purpur 26.2 build 2614 | `27189194D00B93BDF94045F08423D6E3D55D89DE3519E6548FB5A56CA99DCEA7` |
+| Folia 26.1.2 build 8 | `607AFD1C3320008E1FFD2EAEE6780ACE4419D5F8C527B75E79F259BE79EBF57B` |
+| WorldEdit 7.4.2 | `0EE152B1BE5DFB51500505E2BF5A8C9D66F09C7FA484BF9AEA384D7E7B459B06` |
+| WorldGuard-Folia 7.0.15 snapshot | `0EE453113F45AD4129852FA9334789CC6A1F4700BE3FF9396F11FFC6787E02E1` |
+| WorldEdit 7.4.4 | `44C97EE6C1DF9AFA127DF3C5A2C6A7108F826FB44AB7B255A7EC4250FEB89B9D` |
+| WorldGuard 7.0.17 | `3F14562509BF01E7680571B6F56932239157FF938F257C3226DF3B4088AE54F2` |
 
-The blocker was re-audited against the official PaperMC sources on
-2026-07-24:
+The 26.x test roots use ViaVersion and ViaBackwards 5.11.0 only to transport
+the pinned 1.21.10 Mineflayer client. They are not runtime dependencies of
+ProtectionStones.
 
-- The PaperMC Fill GraphQL catalog for Folia family `1.21` contains
-  `1.21.4`, `1.21.5`, `1.21.6`, `1.21.8`, and `1.21.11`; it does not contain
-  `1.21.10`. A direct version query for `1.21.10` returns `null`.
-- `PaperMC/Folia` has no `ver/1.21.10` branch and no tag for that version.
-- Official commit
-  `e1120c1436f9a4a0f849a22ec8c62c7a1e02b74c` still declares
-  `mcVersion=1.21.8`. Its direct child
-  `8bfaa08bec8dfc0b55ab78b82b56dde20d3f55ba` changes the declaration to
-  `mcVersion=1.21.11`.
-
-PaperMC catalog: `https://fill.papermc.io/graphql`
-
-Folia source: `https://github.com/PaperMC/Folia`
-
-Creating an unreviewed private server fork by attempting to transplant Folia
-patches onto Paper 1.21.10 would introduce a different, unaudited runtime. A
-pass on that runtime would not prove compatibility with a released Folia
-1.21.10 implementation and would expand this plugin-maintenance task into
-maintaining server software. The release gate therefore requires an exact,
-provenanced Folia 1.21.10 implementation rather than a locally invented
-substitute.
-
-`AVAILABLE CORE PASS` covers two-player physical placement and break, exact
-WorldGuard region assertions, member/owner/flag/home/hide/parent/merge
-behavior, immediate/delayed/cancelled teleport, real `/ps view` dispatch and
-particle-task generation, environmental protections, reload, clean stop, real
-restart, persistence, and removal.
-
-The representative integration passes cover real Vault sale, purchase, rent,
-and tax transfers; three PlaceholderAPI values; a LuckPerms global claim
-limit; offline owner UUID resolution; and admin cleanup preview/removal.
-Configured actions, public API calls, and custom events also pass on both
-representative platforms.
-
-An upstream-data migration test created a region using the unmodified
-ProtectionStones 2.10.6 JAR
-`D5CEF66231F3534EA2554822947CC882C8D14002208C3639446F0617589CF17C`.
-The candidate preserved its name, owner, member, flags, priority, home, sale
-state, price, and all three upstream TOML/YAML files through two candidate
-restarts.
-
-The unavailable fourth lane remains a release blocker, so none of these
-statuses constitutes a four-lane release pass.
+WorldEdit, WorldGuard, Vault, PlaceholderAPI, and LuckPerms are not bundled in
+the release JAR. WorldEdit and WorldGuard are required; the others are
+optional.

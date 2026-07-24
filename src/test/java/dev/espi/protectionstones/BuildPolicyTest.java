@@ -70,6 +70,24 @@ class BuildPolicyTest {
         assertTrue(pom.contains("<java.version>21</java.version>"));
     }
 
+    @Test
+    void globalAdminDomainRemovalIsRegisteredAndNonDestructive() throws IOException {
+        String adminCommand = Files.readString(MAIN_JAVA.resolve(Path.of(
+                "dev", "espi", "protectionstones", "commands", "ArgAdmin.java"
+        )));
+        assertTrue(adminCommand.contains("case \"removemember\""));
+        assertTrue(adminCommand.contains("case \"removeowner\""));
+
+        String removalCommand = Files.readString(MAIN_JAVA.resolve(Path.of(
+                "dev", "espi", "protectionstones", "commands", "ArgAdminRemovePlayer.java"
+        )));
+        assertTrue(removalCommand.contains("region.removeMember(playerUuid)"));
+        assertTrue(removalCommand.contains("region.removeOwner(playerUuid)"));
+        assertTrue(removalCommand.contains("regionManager.saveChanges()"));
+        assertFalse(removalCommand.contains("deleteRegion("));
+        assertFalse(removalCommand.contains("removeRegion("));
+    }
+
     private static List<Path> javaSources() throws IOException {
         try (Stream<Path> paths = Files.walk(MAIN_JAVA)) {
             return paths.filter(path -> path.toString().endsWith(".java")).toList();

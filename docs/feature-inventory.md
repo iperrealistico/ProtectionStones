@@ -10,7 +10,7 @@ checks run on at least one Purpur and one Folia lane.
 | Block acquisition/give | `ArgGet`, `ArgGive`, `PSProtectBlock` | inventory and optional Vault | C-02, I-01 |
 | Claim placement | `BlockHandler`, `ListenerClass` | region block and WG manager | C-02, C-03 |
 | Break/unclaim | `ListenerClass`, `ArgUnclaim`, `PSStandardRegion` | region block, event, name cache | C-07 |
-| Owners/members | `ArgAddRemove`, `PSRegion` | player context and WG membership | C-04 |
+| Owners/members | `ArgAddRemove`, `ArgAdminRemovePlayer`, `PSRegion` | player context, global scans, WG domains, and persistence | C-03, C-09 |
 | Flags/defaults | `ArgFlag`, `FlagHandler` | WG flags and permissions | C-05 |
 | Hide/unhide | `ArgHideUnhide`, `ArgAdminHide`, `PSRegion` | region block ownership | C-06 |
 | Homes/teleport | `ArgHome`, `ArgSethome`, `ArgTp` | entity timer, movement, cross-world teleport | C-08 |
@@ -26,6 +26,7 @@ checks run on at least one Purpur and one Folia lane.
 | LuckPerms limits | `LimitUtil`, `MiscUtil` | async permission data/API | I-03 |
 | UUID/offline players | `UUIDCache`, `PSPlayer` | cross-region cache and profile lookup | I-04 |
 | Admin cleanup/repair/stats | `ArgAdmin*` | global scan, report I/O, sequential regions | I-05 |
+| Global admin domain removal | `ArgAdminRemovePlayer` | loaded-world scan, ownerless regions, WG save | C-09 |
 | Public API/events | `PSRegion`, `PSPlayer`, `event/*` | binary/source and event behavior | I-07 |
 | Persistence/restart | WorldGuard flags and TOML/YAML | no destructive migration | C-13, I-08 |
 
@@ -38,3 +39,6 @@ Default arguments remain: `add`, `remove`, `addowner`, `removeowner`, `admin`,
 and `help`.
 
 Permissions remain under `protectionstones.*` as declared in `plugin.yml`.
+The fork adds `admin removemember <playername|uuid>` and
+`admin removeowner <playername|uuid>` under the existing
+`protectionstones.admin` permission.
