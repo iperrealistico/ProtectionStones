@@ -1,6 +1,6 @@
 # Release Checklist
 
-- [ ] Operator branch is pushed to `origin`.
+- [x] Operator branch is pushed to `origin`.
 - [x] Upstream base commit and fork version are recorded.
 - [x] Java 21 and Java 25 `clean verify` pass.
 - [x] Two clean canonical Java 21 builds reproduce one main-JAR SHA-256.
