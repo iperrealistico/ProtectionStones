@@ -147,8 +147,13 @@ New-Item -ItemType Directory -Force -Path $blockedRoot | Out-Null
 # BLOCKED: no Folia 1.21.10 runtime
 
 PaperMC's Folia project has no published 1.21.10 build and no `ver/1.21.10`
-source branch. Its official history updates directly from 1.21.8 to 1.21.11.
-Neither adjacent version is an acceptable substitute for the required lane.
+source branch. The official Fill catalog omits 1.21.10, and a direct version
+query returns null. In source history, commit e1120c1436f9a4a0f849a22ec8c62c7a1e02b74c
+still declares mcVersion=1.21.8; its direct child
+8bfaa08bec8dfc0b55ab78b82b56dde20d3f55ba declares mcVersion=1.21.11.
+
+Neither adjacent version nor a locally invented server port is an acceptable
+substitute for the exact required lane.
 
 Checked: 2026-07-24
 '@ | Set-Content -LiteralPath (Join-Path $blockedRoot "BLOCKED.md") -Encoding utf8

@@ -48,6 +48,33 @@ The missing Folia 1.21.10 runtime is a release blocker. Folia history updates
 directly from 1.21.8 to 1.21.11, so substituting either version would not prove
 the requested lane.
 
+### Folia 1.21.10 blocker evidence
+
+The blocker was re-audited against the official PaperMC sources on
+2026-07-24:
+
+- The PaperMC Fill GraphQL catalog for Folia family `1.21` contains
+  `1.21.4`, `1.21.5`, `1.21.6`, `1.21.8`, and `1.21.11`; it does not contain
+  `1.21.10`. A direct version query for `1.21.10` returns `null`.
+- `PaperMC/Folia` has no `ver/1.21.10` branch and no tag for that version.
+- Official commit
+  `e1120c1436f9a4a0f849a22ec8c62c7a1e02b74c` still declares
+  `mcVersion=1.21.8`. Its direct child
+  `8bfaa08bec8dfc0b55ab78b82b56dde20d3f55ba` changes the declaration to
+  `mcVersion=1.21.11`.
+
+PaperMC catalog: `https://fill.papermc.io/graphql`
+
+Folia source: `https://github.com/PaperMC/Folia`
+
+Creating an unreviewed private server fork by attempting to transplant Folia
+patches onto Paper 1.21.10 would introduce a different, unaudited runtime. A
+pass on that runtime would not prove compatibility with a released Folia
+1.21.10 implementation and would expand this plugin-maintenance task into
+maintaining server software. The release gate therefore requires an exact,
+provenanced Folia 1.21.10 implementation rather than a locally invented
+substitute.
+
 `AVAILABLE CORE PASS` covers two-player physical placement and break, exact
 WorldGuard region assertions, member/owner/flag/home/hide/parent/merge
 behavior, immediate/delayed/cancelled teleport, real `/ps view` dispatch and
