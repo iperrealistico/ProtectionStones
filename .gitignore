@@ -7,3 +7,7 @@
 /.project
 /dependency-reduced-pom.xml
 /*.iml
+/test-harness/mineflayer/node_modules/
+/test-harness/runtime-probe/target/
+/test-harness/test-vault/target/
+/test-harness/integration-probe/target/

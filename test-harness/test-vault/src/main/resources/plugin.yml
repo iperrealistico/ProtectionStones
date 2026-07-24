@@ -1,0 +1,13 @@
+name: Vault
+version: 1.0.0-test
+main: club.peacefulvanilla.protectionstonestestvault.TestVaultPlugin
+api-version: "1.21.10"
+folia-supported: true
+load: STARTUP
+commands:
+  testvault:
+    description: Controls the local-only deterministic test economy.
+    permission: protectionstones.testvault
+permissions:
+  protectionstones.testvault:
+    default: op

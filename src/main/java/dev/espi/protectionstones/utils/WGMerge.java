@@ -21,7 +21,6 @@ import com.sk89q.worldguard.protection.managers.RemovalStrategy;
 import com.sk89q.worldguard.protection.regions.ProtectedPolygonalRegion;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.espi.protectionstones.*;
-import org.bukkit.Bukkit;
 import org.bukkit.World;
 
 import java.util.*;
@@ -262,7 +261,7 @@ public class WGMerge {
         for (PSRegion r : merge) {
             if (!r.getId().equals(newID)) {
                 // run delete event for non-root real regions
-                Bukkit.getScheduler().runTask(ProtectionStones.getInstance(), () -> r.deleteRegion(false));
+                r.deleteRegion(false);
             } else {
                 rm.removeRegion(r.getId());
             }

@@ -23,8 +23,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ArgReload implements PSCommandArg {
+    private static final AtomicBoolean RELOAD_RUNNING = new AtomicBoolean();
 
     // /ps reload
 
@@ -54,9 +56,19 @@ public class ArgReload implements PSCommandArg {
             PSL.msg(p, PSL.NO_PERMISSION_ADMIN.msg());
             return true;
         }
+        if (!RELOAD_RUNNING.compareAndSet(false, true)) {
+            return true;
+        }
         PSL.msg(p, PSL.RELOAD_START.msg());
-        ProtectionStones.loadConfig(true);
-        PSL.msg(p, PSL.RELOAD_COMPLETE.msg());
+        ProtectionStones.getInstance().getTaskScheduler().runGlobal(() -> {
+            try {
+                ProtectionStones.loadConfig(true);
+                ProtectionStones.getInstance().getTaskScheduler()
+                        .runCommandSender(p, () -> PSL.msg(p, PSL.RELOAD_COMPLETE.msg()));
+            } finally {
+                RELOAD_RUNNING.set(false);
+            }
+        });
         return true;
     }
 

@@ -16,6 +16,7 @@
 package dev.espi.protectionstones.commands;
 
 import dev.espi.protectionstones.*;
+import dev.espi.protectionstones.scheduler.TaskHandle;
 import dev.espi.protectionstones.utils.ChatUtil;
 import dev.espi.protectionstones.utils.UUIDCache;
 import org.bukkit.Bukkit;
@@ -23,14 +24,15 @@ import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class ArgTp implements PSCommandArg {
 
-    private static HashMap<UUID, Integer> waitCounter = new HashMap<>();
-    private static HashMap<UUID, BukkitTask> taskCounter = new HashMap<>();
+    private static final ConcurrentMap<UUID, Integer> waitCounter = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<UUID, TaskHandle> taskCounter = new ConcurrentHashMap<>();
 
     // /ps tp, /ps home
 
@@ -66,7 +68,7 @@ public class ArgTp implements PSCommandArg {
             return PSL.msg(p, PSL.TP_HELP.msg());
 
         if (args.length == 2) { // /ps tp [name/id]
-            Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+            ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () -> {
                 // get regions from the query
                 List<PSRegion> regions = ProtectionStones.getPSRegions(p.getWorld(), args[1]);
 
@@ -100,7 +102,7 @@ public class ArgTp implements PSCommandArg {
             UUID tpUuid = UUIDCache.getUUIDFromName(tpName);
 
             // run region search asynchronously to avoid blocking server thread
-            Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+            ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () -> {
                 List<PSRegion> regions = PSPlayer.fromUUID(tpUuid).getPSRegionsCrossWorld(p.getWorld(), false);
 
                 // check if region was found
@@ -138,15 +140,23 @@ public class ArgTp implements PSCommandArg {
         if (r.getTypeOptions().tpWaitingSeconds == 0 || p.hasPermission("protectionstones.tp.bypasswait")) {
             // no teleport delay
             PSL.msg(p, PSL.TPING.msg());
-            Bukkit.getScheduler().runTask(ProtectionStones.getInstance(), () -> p.teleport(r.getHome())); // run on main thread, not async
+            p.teleportAsync(r.getHome());
         } else if (!r.getTypeOptions().noMovingWhenTeleportWaiting) {
             // teleport delay, but doesn't care about moving
             p.sendMessage(PSL.TP_IN_SECONDS.msg().replace("%seconds%", "" + r.getTypeOptions().tpWaitingSeconds));
 
-            Bukkit.getScheduler().runTaskLater(ProtectionStones.getInstance(), () -> {
-                PSL.msg(p, PSL.TPING.msg());
-                p.teleport(r.getHome());
-            }, 20 * r.getTypeOptions().tpWaitingSeconds);
+            UUID uuid = p.getUniqueId();
+            removeUUIDTimer(uuid);
+            TaskHandle teleportTask = ProtectionStones.getInstance().getTaskScheduler()
+                    .runEntityDelayed(p, () -> {
+                        removeUUIDTimer(uuid);
+                        PSL.msg(p, PSL.TPING.msg());
+                        p.teleportAsync(r.getHome());
+                    }, () -> removeUUIDTimer(uuid), 20L * r.getTypeOptions().tpWaitingSeconds);
+            taskCounter.put(uuid, teleportTask);
+            if (teleportTask.isDone()) {
+                taskCounter.remove(uuid, teleportTask);
+            }
 
         } else {// delay and not allowed to move
             PSL.msg(p, PSL.TP_IN_SECONDS.msg().replace("%seconds%", "" + r.getTypeOptions().tpWaitingSeconds));
@@ -158,14 +168,10 @@ public class ArgTp implements PSCommandArg {
 
             // add teleport wait tasks to queue
             waitCounter.put(uuid, 0);
-            taskCounter.put(uuid, Bukkit.getScheduler().runTaskTimer(ProtectionStones.getInstance(), () -> {
-                        Player pl = Bukkit.getPlayer(uuid);
-                        // cancel if the player is not on the server
-                        if (pl == null) {
-                            removeUUIDTimer(uuid);
-                            return;
-                        }
-
+            TaskHandle teleportTask = ProtectionStones.getInstance().getTaskScheduler().runEntityAtFixedRate(
+                    p,
+                    () -> {
+                        Player pl = p;
                         if (waitCounter.get(uuid) == null) {
                             removeUUIDTimer(uuid);
                             return;
@@ -183,11 +189,19 @@ public class ArgTp implements PSCommandArg {
                         } else if (waitCounter.get(uuid) == r.getTypeOptions().tpWaitingSeconds * 4) { // * 4 since this loops 4 times a second
                             // if the timer has passed, teleport and cancel
                             PSL.msg(pl, PSL.TPING.msg());
-                            pl.teleport(r.getHome());
+                            pl.teleportAsync(r.getHome());
                             removeUUIDTimer(uuid);
                         }
-                    }, 5, 5) // loop 4 times a second
+                    },
+                    () -> removeUUIDTimer(uuid),
+                    5,
+                    5
             );
+            taskCounter.put(uuid, teleportTask);
+            if (teleportTask.isDone()) {
+                taskCounter.remove(uuid, teleportTask);
+                waitCounter.remove(uuid);
+            }
         }
     }
 
@@ -196,8 +210,14 @@ public class ArgTp implements PSCommandArg {
     }
 
     private static void removeUUIDTimer(UUID uuid) {
-        if (taskCounter.get(uuid) != null) taskCounter.get(uuid).cancel();
+        TaskHandle task = taskCounter.remove(uuid);
+        if (task != null) task.cancel();
         waitCounter.remove(uuid);
-        taskCounter.remove(uuid);
+    }
+
+    public static void cancelAllTeleports() {
+        for (UUID uuid : taskCounter.keySet().toArray(UUID[]::new)) {
+            removeUUIDTimer(uuid);
+        }
     }
 }

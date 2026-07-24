@@ -28,6 +28,7 @@ import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -129,20 +130,26 @@ public class ArgMerge implements PSCommandArg {
             if (!WGUtils.canMergeRegionTypes(aRegion.getTypeOptions(), aRoot))
                 return PSL.msg(p, PSL.MERGE_NOT_ALLOWED.msg());
 
-            Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+            World world = p.getWorld();
+            ProtectionStones.getInstance().getTaskScheduler().runGlobal(() -> {
                 try {
-                    WGMerge.mergeRealRegions(p.getWorld(), rm, aRoot, Arrays.asList(aRegion, aRoot));
+                    WGMerge.mergeRealRegions(world, rm, aRoot, Arrays.asList(aRegion, aRoot));
                 } catch (WGMerge.RegionHoleException e) {
-                    PSL.msg(p, PSL.NO_REGION_HOLES.msg());
+                    ProtectionStones.getInstance().getTaskScheduler()
+                            .runEntity(p, () -> PSL.msg(p, PSL.NO_REGION_HOLES.msg()));
                     return;
                 } catch (WGMerge.RegionCannotMergeWhileRentedException e) {
-                    PSL.msg(p, PSL.CANNOT_MERGE_RENTED_REGION.msg().replace("%region%", e.getRentedRegion().getName() == null ? e.getRentedRegion().getId() : e.getRentedRegion().getName()));
+                    ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () ->
+                            PSL.msg(p, PSL.CANNOT_MERGE_RENTED_REGION.msg()
+                                    .replace("%region%", e.getRentedRegion().getName() == null
+                                            ? e.getRentedRegion().getId()
+                                            : e.getRentedRegion().getName())));
                     return;
                 }
-                PSL.msg(p, PSL.MERGE_MERGED.msg());
 
                 // show menu again if the new region still has overlapping regions
-                Bukkit.getScheduler().runTask(ProtectionStones.getInstance(), () -> {
+                ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () -> {
+                    PSL.msg(p, PSL.MERGE_MERGED.msg());
                     if (!getGUI(p, PSRegion.fromWGRegion(p.getWorld(), rm.getRegion(aRoot.getId()))).isEmpty()) {
                         Bukkit.dispatchCommand(p, ProtectionStones.getInstance().getConfigOptions().base_command + " merge");
                     }

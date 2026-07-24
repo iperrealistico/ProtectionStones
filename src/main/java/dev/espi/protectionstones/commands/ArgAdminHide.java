@@ -26,6 +26,10 @@ import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 class ArgAdminHide {
 
     // /ps admin hide
@@ -48,22 +52,43 @@ class ArgAdminHide {
             mgr = WGUtils.getRegionManagerWithWorld(w);
         }
 
-        Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+        ProtectionStones.getInstance().getTaskScheduler().runGlobal(() -> {
+            List<PSRegion> regions = new ArrayList<>();
             // loop through regions that are protection stones and hide or unhide the block
             for (ProtectedRegion r : mgr.getRegions().values()) {
                 if (ProtectionStones.isPSRegion(r)) {
-                    PSRegion region = PSRegion.fromWGRegion(w, r);
-                    if (args[1].equalsIgnoreCase("hide")) {
-                        Bukkit.getScheduler().runTask(ProtectionStones.getInstance(), region::hide);
-                    } else if (args[1].equalsIgnoreCase("unhide")){
-                        Bukkit.getScheduler().runTask(ProtectionStones.getInstance(), region::unhide);
-                    }
+                    regions.add(PSRegion.fromWGRegion(w, r));
                 }
             }
 
             String hMessage = args[1].equalsIgnoreCase("unhide") ? "unhidden" : "hidden";
-            PSL.msg(p, PSL.ADMIN_HIDE_TOGGLED.msg()
-                    .replace("%message%", hMessage));
+            Runnable complete = () -> ProtectionStones.getInstance().getTaskScheduler()
+                    .runCommandSender(p, () -> PSL.msg(p, PSL.ADMIN_HIDE_TOGGLED.msg()
+                            .replace("%message%", hMessage)));
+            if (regions.isEmpty()) {
+                complete.run();
+                return;
+            }
+
+            AtomicInteger remaining = new AtomicInteger(regions.size());
+            for (PSRegion region : regions) {
+                ProtectionStones.getInstance().getTaskScheduler().runRegion(
+                        region.getProtectBlockLocation(),
+                        () -> {
+                            try {
+                                if (args[1].equalsIgnoreCase("hide")) {
+                                    region.hide();
+                                } else if (args[1].equalsIgnoreCase("unhide")) {
+                                    region.unhide();
+                                }
+                            } finally {
+                                if (remaining.decrementAndGet() == 0) {
+                                    complete.run();
+                                }
+                            }
+                        }
+                );
+            }
         });
 
         return true;

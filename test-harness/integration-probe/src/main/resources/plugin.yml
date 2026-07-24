@@ -1,0 +1,14 @@
+name: ProtectionStonesIntegrationProbe
+version: 1.0.0
+main: club.peacefulvanilla.protectionstonesintegrationprobe.ProtectionStonesIntegrationProbe
+api-version: "1.21.10"
+folia-supported: true
+depend:
+  - ProtectionStones
+commands:
+  psintegrationprobe:
+    description: Prepares deterministic ProtectionStones integration assertions.
+    permission: protectionstones.integrationprobe
+permissions:
+  protectionstones.integrationprobe:
+    default: op

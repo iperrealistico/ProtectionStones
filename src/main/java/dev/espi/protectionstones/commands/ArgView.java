@@ -25,11 +25,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ArgView implements PSCommandArg {
 
-    private static List<UUID> cooldown = new ArrayList<>();
+    private static final Set<UUID> cooldown = ConcurrentHashMap.newKeySet();
 
     @Override
     public List<String> getNames() {
@@ -78,13 +80,17 @@ public class ArgView implements PSCommandArg {
 
         // add player to cooldown
         cooldown.add(p.getUniqueId());
-        Bukkit.getScheduler().runTaskLaterAsynchronously(ProtectionStones.getInstance(), () -> cooldown.remove(p.getUniqueId()), 20 * ProtectionStones.getInstance().getConfigOptions().psViewCooldown);
+        ProtectionStones.getInstance().getTaskScheduler().runAsyncDelayed(
+                () -> cooldown.remove(p.getUniqueId()),
+                ProtectionStones.getInstance().getConfigOptions().psViewCooldown,
+                TimeUnit.SECONDS
+        );
 
         int playerY = p.getLocation().getBlockY(), minY = r.getWGRegion().getMinimumPoint().getBlockY(), maxY = r.getWGRegion().getMaximumPoint().getBlockY();
 
         // send particles to client
 
-        Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+        ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () -> {
 
             AtomicInteger modU = new AtomicInteger(0);
 
@@ -127,7 +133,8 @@ public class ArgView implements PSCommandArg {
         return null;
     }
 
-    private static int PARTICLE_VIEW_DISTANCE_LIMIT = 150;
+    private static final int PARTICLE_VIEW_DISTANCE_LIMIT = 150;
+    static final float PURPLE_PARTICLE_SIZE = 4.0F;
 
     private static boolean handlePinkParticle(Player p, Location l) {
         if (p.getLocation().distance(l) > PARTICLE_VIEW_DISTANCE_LIMIT || Math.abs(l.getY()-p.getLocation().getY()) > 30) return false;
@@ -143,7 +150,12 @@ public class ArgView implements PSCommandArg {
 
     private static boolean handlePurpleParticle(Player p, Location l) {
         if (p.getLocation().distance(l) > PARTICLE_VIEW_DISTANCE_LIMIT || Math.abs(l.getY()-p.getLocation().getY()) > 30) return false;
-        ParticlesUtil.persistRedstoneParticle(p, l, new Particle.DustOptions(Color.fromRGB(255, 0, 255), 10), 30);
+        ParticlesUtil.persistRedstoneParticle(
+                p,
+                l,
+                new Particle.DustOptions(Color.fromRGB(255, 0, 255), PURPLE_PARTICLE_SIZE),
+                30
+        );
         return true;
     }
 }

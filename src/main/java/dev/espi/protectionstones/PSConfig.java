@@ -115,10 +115,6 @@ public class PSConfig {
             Logger.getLogger(ProtectionStones.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-        // keep in mind that there is /ps reload, so clear arrays before adding config options!
-        // clear data (for /ps reload)
-        ProtectionStones.protectionStonesOptions.clear();
-
         // create config object
         if (ProtectionStones.config == null) {
             ProtectionStones.config = CommentedFileConfig.builder(ProtectionStones.configLocation).sync().build();
@@ -139,8 +135,12 @@ public class PSConfig {
             ProtectionStones.config.save();
         } while (true);
 
-        // load protection stones to options map
-        if (ProtectionStones.blockDataFolder.listFiles().length == 0) {
+        Map<String, PSProtectBlock> loadedProtectionStones = new LinkedHashMap<>();
+        Map<String, String> loadedBase64Heads = new HashMap<>();
+        File[] blockFiles = ProtectionStones.blockDataFolder.listFiles();
+
+        // load protection stones to a new snapshot
+        if (blockFiles == null || blockFiles.length == 0) {
             ProtectionStones.getPluginLogger().warning("The blocks folder is empty! You do not have any protection blocks configured!");
         } else {
 
@@ -160,7 +160,7 @@ public class PSConfig {
 
             // iterate over block files and load into map
             ProtectionStones.getPluginLogger().info("Protection Stone Blocks:");
-            for (File file : ProtectionStones.blockDataFolder.listFiles()) {
+            for (File file : blockFiles) {
 
                 CommentedFileConfig c = CommentedFileConfig.builder(file).sync().build();
                 c.load();
@@ -198,11 +198,12 @@ public class PSConfig {
                 }
 
                 // check for duplicates
-                if (ProtectionStones.isProtectBlockType(b.type)) {
+                if (loadedProtectionStones.containsKey(b.type)) {
                     ProtectionStones.getPluginLogger().warning("Duplicate block type found! Ignoring the extra block " + b.type);
                     continue;
                 }
-                if (ProtectionStones.getProtectBlockFromAlias(b.alias) != null) {
+                if (loadedProtectionStones.values().stream()
+                        .anyMatch(loadedBlock -> loadedBlock.alias.equals(b.alias))) {
                     ProtectionStones.getPluginLogger().warning("Duplicate block alias found! Ignoring the extra block " + b.alias);
                     continue;
                 }
@@ -214,19 +215,22 @@ public class PSConfig {
                 if (BlockUtil.isBase64PSHead(b.type)) {
                     String nuuid = BlockUtil.getUUIDFromBase64PS(b);
 
-                    BlockUtil.uuidToBase64Head.put(nuuid, b.type.split(":")[1]);
+                    loadedBase64Heads.put(nuuid, b.type.split(":")[1]);
                     b.type = "PLAYER_HEAD:" + nuuid;
                 }
 
-                ProtectionStones.protectionStonesOptions.put(b.type, b); // add block
+                loadedProtectionStones.put(b.type, b);
             }
 
             // cleanup temp file
             template.close();
             tempFile.delete();
-
-            // setup crafting recipes for all blocks
-            RecipeUtil.setupPSRecipes();
         }
+
+        // Publish complete snapshots only after every block file has been parsed.
+        RecipeUtil.removePSRecipes();
+        ProtectionStones.replaceProtectionStonesOptions(loadedProtectionStones);
+        BlockUtil.uuidToBase64Head = new HashMap<>(loadedBase64Heads);
+        RecipeUtil.setupPSRecipes();
     }
 }

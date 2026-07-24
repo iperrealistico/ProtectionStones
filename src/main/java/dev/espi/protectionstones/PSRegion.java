@@ -149,14 +149,16 @@ public abstract class PSRegion {
 
         List<PSRegion> l = new ArrayList<>();
 
-        List<String> rIds = ProtectionStones.regionNameToID.get(w.getUID()).get(name);
+        Map<String, ? extends List<String>> worldNames =
+                ProtectionStones.regionNameToID.get(w.getUID());
+        if (worldNames == null) return l;
+
+        List<String> rIds = worldNames.get(name);
         if (rIds == null) return l;
 
-        for (int i = 0; i < rIds.size(); i++) {
-            String id = rIds.get(i);
+        for (String id : rIds) {
             if (rgm.getRegion(id) == null) { // cleanup cache
-                rIds.remove(i);
-                i--;
+                rIds.remove(id);
             } else {
                 l.add(fromWGRegion(w, rgm.getRegion(id)));
             }
@@ -175,7 +177,9 @@ public abstract class PSRegion {
         HashMap<World, List<PSRegion>> regions = new HashMap<>();
         for (UUID worldUid : ProtectionStones.regionNameToID.keySet()) {
             World w = Bukkit.getWorld(worldUid);
-            regions.put(w, fromName(w, name));
+            if (w != null) {
+                regions.put(w, fromName(w, name));
+            }
         }
         return regions;
     }
@@ -626,6 +630,14 @@ public abstract class PSRegion {
      * @return returns the block that may contain the protection stone
      */
     public abstract Block getProtectBlock();
+
+    /**
+     * Returns the protection block coordinates without reading the world block.
+     */
+    public Location getProtectBlockLocation() {
+        PSLocation location = WGUtils.parsePSRegionToLocation(getId());
+        return new Location(getWorld(), location.x, location.y, location.z);
+    }
 
     /**
      * @return returns the type, or null if the type is not configured

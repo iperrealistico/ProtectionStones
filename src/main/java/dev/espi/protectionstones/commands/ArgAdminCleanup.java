@@ -6,11 +6,11 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
 package dev.espi.protectionstones.commands;
@@ -21,175 +21,265 @@ import dev.espi.protectionstones.PSL;
 import dev.espi.protectionstones.PSRegion;
 import dev.espi.protectionstones.ProtectionStones;
 import dev.espi.protectionstones.utils.WGUtils;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
-class ArgAdminCleanup {
+public class ArgAdminCleanup {
 
-    private static File previewFile;
-    private static FileWriter previewFileOutputStream;
+    private static final AtomicBoolean CLEANUP_RUNNING = new AtomicBoolean();
+    private static final AtomicLong CLEANUP_GENERATION = new AtomicLong();
 
     // /ps admin cleanup [remove/preview]
-    static boolean argumentAdminCleanup(CommandSender p, String[] preParseArgs) {
-        if (preParseArgs.length < 3 || !Arrays.asList("remove", "preview").contains(preParseArgs[2].toLowerCase())) {
-            PSL.msg(p, ArgAdmin.getCleanupHelp());
+    static boolean argumentAdminCleanup(CommandSender sender, String[] preParseArgs) {
+        if (preParseArgs.length < 3
+                || !Arrays.asList("remove", "preview").contains(preParseArgs[2].toLowerCase())) {
+            PSL.msg(sender, ArgAdmin.getCleanupHelp());
             return true;
         }
 
-        String cleanupOperation = preParseArgs[2].toLowerCase(); // [remove|preview]
-
-        World w;
+        String operation = preParseArgs[2].toLowerCase();
+        World world;
         String alias = null;
-
         List<String> args = new ArrayList<>();
 
-        // determine if there is an alias flag selected, and remove [-t typealias] if there is
         for (int i = 3; i < preParseArgs.length; i++) {
-            if (preParseArgs[i].equals("-t") && i != preParseArgs.length-1) {
+            if (preParseArgs[i].equals("-t") && i != preParseArgs.length - 1) {
                 alias = preParseArgs[++i];
             } else {
                 args.add(preParseArgs[i]);
             }
         }
 
-        // the args array should consist of: [days, world (optional)]
         if (args.size() > 1 && Bukkit.getWorld(args.get(1)) != null) {
-            w = Bukkit.getWorld(args.get(1));
+            world = Bukkit.getWorld(args.get(1));
+        } else if (sender instanceof Player player) {
+            world = player.getWorld();
         } else {
-            if (p instanceof Player) {
-                w = ((Player) p).getWorld();
-            } else {
-                PSL.msg(p, args.size() > 1 ? PSL.INVALID_WORLD.msg() : PSL.ADMIN_CONSOLE_WORLD.msg());
-                return true;
-            }
+            PSL.msg(sender, args.size() > 1
+                    ? PSL.INVALID_WORLD.msg()
+                    : PSL.ADMIN_CONSOLE_WORLD.msg());
+            return true;
         }
 
-        // create preview file
-        if (cleanupOperation.equals("preview")) {
+        int days;
+        try {
+            days = args.isEmpty() ? 30 : Integer.parseInt(args.get(0));
+        } catch (NumberFormatException exception) {
+            PSL.msg(sender, ArgAdmin.getCleanupHelp());
+            return true;
+        }
+
+        if (!CLEANUP_RUNNING.compareAndSet(false, true)) {
+            PSL.msg(sender, ChatColor.RED + "A cleanup operation is already running.");
+            return true;
+        }
+        long cleanupId = CLEANUP_GENERATION.incrementAndGet();
+
+        Path previewFile = null;
+        if (operation.equals("preview")) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd H-m-s");
-            previewFile = new File(ProtectionStones.getInstance().getDataFolder().getAbsolutePath() + "/" + LocalDateTime.now().format(formatter) + " cleanup preview.txt");
-            try {
-                previewFile.createNewFile();
-                previewFileOutputStream = new FileWriter(previewFile);
-            } catch (IOException e) {
-                e.printStackTrace();
-                p.sendMessage(ChatColor.RED + "Internal error, please check the console logs.");
-                return true;
-            }
+            previewFile = ProtectionStones.getInstance().getDataFolder().toPath()
+                    .resolve(LocalDateTime.now().format(formatter) + " cleanup preview.txt");
         }
 
-        RegionManager rgm = WGUtils.getRegionManagerWithWorld(w);
-        Map<String, ProtectedRegion> regions = rgm.getRegions();
-
-        // async cleanup task
-        String finalAlias = alias;
-        Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
-            int days = (args.size() > 0) ? Integer.parseInt(args.get(0)) : 30; // 30 days is default if days aren't specified
-
-            PSL.msg(p, PSL.ADMIN_CLEANUP_HEADER.msg()
-                    .replace("%arg%", cleanupOperation)
-                    .replace("%days%", "" + days));
-
-            HashSet<UUID> activePlayers = new HashSet<>();
-
-            // loop over offline players and add to list if they haven't joined recently
-            for (OfflinePlayer op : Bukkit.getServer().getOfflinePlayers()) {
-                long lastPlayed = (System.currentTimeMillis() - op.getLastPlayed()) / 86400000L;
-                try {
-                    // a player is active if they have joined within the days
-                    if (lastPlayed < days) {
-                        activePlayers.add(op.getUniqueId());
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            // loop over all regions async and find regions to delete
-            List<PSRegion> toDelete = new ArrayList<>();
-            for (String regionId : regions.keySet()) {
-                PSRegion r = PSRegion.fromWGRegion(w, regions.get(regionId));
-                if (r == null) { // not a ps region (unconfigured types still count as ps regions)
-                    continue;
-                }
-
-                // if an alias is specified, skip regions that aren't of the type
-                if (finalAlias != null && (r.getTypeOptions() == null || !r.getTypeOptions().alias.equals(finalAlias))) {
-                    continue;
-                }
-
-                long numOfActiveOwners = r.getOwners().stream().filter(activePlayers::contains).count();
-                long numOfActiveMembers = r.getMembers().stream().filter(activePlayers::contains).count();
-
-                // remove region if there are no owners left
-                if (numOfActiveOwners == 0) {
-                    if (ProtectionStones.getInstance().getConfigOptions().cleanupDeleteRegionsWithMembersButNoOwners || numOfActiveMembers == 0) {
-                        toDelete.add(r);
-                    }
-                }
-            }
-
-            // start recursive iteration to delete a region each tick
-            Iterator<PSRegion> deleteRegionsIterator = toDelete.iterator();
-            regionLoop(deleteRegionsIterator, p, cleanupOperation.equalsIgnoreCase("remove"));
-        });
+        RegionManager regionManager = WGUtils.getRegionManagerWithWorld(world);
+        String selectedAlias = alias;
+        Path selectedPreviewFile = previewFile;
+        ProtectionStones.getInstance().getTaskScheduler().runGlobal(() ->
+                scanRegions(
+                        sender,
+                        operation,
+                        days,
+                        world,
+                        regionManager,
+                        selectedAlias,
+                        selectedPreviewFile,
+                        cleanupId
+                ));
         return true;
     }
 
-    static private void regionLoop(Iterator<PSRegion> deleteRegionsIterator, CommandSender p, boolean isRemoveOperation) {
-        if (deleteRegionsIterator.hasNext()) {
-            Bukkit.getScheduler().runTaskLater(ProtectionStones.getInstance(), () ->
-                    processRegion(deleteRegionsIterator, p, isRemoveOperation), 1);
-        } else { // finished region iteration
-            PSL.msg(p, PSL.ADMIN_CLEANUP_FOOTER.msg()
-                    .replace("%arg%", isRemoveOperation ? "remove" : "preview"));
+    private static void scanRegions(
+            CommandSender sender,
+            String operation,
+            int days,
+            World world,
+            RegionManager regionManager,
+            String alias,
+            Path previewFile,
+            long cleanupId
+    ) {
+        if (!isActive(cleanupId)) {
+            return;
+        }
+        try {
+            send(sender, () -> PSL.msg(sender, PSL.ADMIN_CLEANUP_HEADER.msg()
+                    .replace("%arg%", operation)
+                    .replace("%days%", String.valueOf(days))));
 
-            // flush and close preview file
-            if (!isRemoveOperation) {
-                try {
-                    p.sendMessage(ChatColor.YELLOW + "Dumped the list regions that can be deleted in " + previewFile.getName() + " (in the plugin folder).");
-                    previewFileOutputStream.flush();
-                    previewFileOutputStream.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
+            Set<UUID> activePlayers = new HashSet<>();
+            for (OfflinePlayer offlinePlayer : Bukkit.getServer().getOfflinePlayers()) {
+                long daysSinceLastPlayed =
+                        (System.currentTimeMillis() - offlinePlayer.getLastPlayed()) / 86400000L;
+                if (daysSinceLastPlayed < days) {
+                    activePlayers.add(offlinePlayer.getUniqueId());
                 }
             }
+
+            List<PSRegion> toDelete = new ArrayList<>();
+            for (ProtectedRegion protectedRegion : regionManager.getRegions().values()) {
+                PSRegion region = PSRegion.fromWGRegion(world, protectedRegion);
+                if (region == null) {
+                    continue;
+                }
+                if (alias != null
+                        && (region.getTypeOptions() == null
+                        || !region.getTypeOptions().alias.equals(alias))) {
+                    continue;
+                }
+
+                long activeOwners = region.getOwners().stream().filter(activePlayers::contains).count();
+                long activeMembers = region.getMembers().stream().filter(activePlayers::contains).count();
+                if (activeOwners == 0
+                        && (ProtectionStones.getInstance().getConfigOptions()
+                        .cleanupDeleteRegionsWithMembersButNoOwners || activeMembers == 0)) {
+                    toDelete.add(region);
+                }
+            }
+
+            if (operation.equals("preview")) {
+                writePreview(sender, toDelete, previewFile, cleanupId);
+            } else {
+                removeNext(sender, toDelete.iterator(), cleanupId);
+            }
+        } catch (RuntimeException exception) {
+            fail(sender, exception, cleanupId);
         }
     }
 
-    // Process a region, and then iterate to the next region on the next tick.
-    // This is to prevent the server from pausing for the entire duration of the cleanup.
-    // (lag from loading chunks to remove protection blocks)
-    static private void processRegion(Iterator<PSRegion> deleteRegionsIterator, CommandSender p, boolean isRemoveOperation) {
-        PSRegion r = deleteRegionsIterator.next();
-
-        if (isRemoveOperation) { // delete
-
-            p.sendMessage(ChatColor.YELLOW + "Removed region " + r.getId() + " due to inactive owners.");
-
-            // must be sync
-            r.deleteRegion(true);
-        } else { // preview
-
-            p.sendMessage(ChatColor.YELLOW + "Found region " + r.getId() + " that can be deleted.");
-
-            // adds region id to preview file
-            try {
-                previewFileOutputStream.write(r.getId() + "\n");
-            } catch (IOException e) {
-                e.printStackTrace();
+    private static void writePreview(
+            CommandSender sender,
+            List<PSRegion> regions,
+            Path previewFile,
+            long cleanupId
+    ) {
+        ProtectionStones.getInstance().getTaskScheduler().runAsync(() -> {
+            if (!isActive(cleanupId)) {
+                return;
             }
+            try {
+                Files.createDirectories(previewFile.getParent());
+                List<String> regionIds = regions.stream().map(PSRegion::getId).toList();
+                Files.write(previewFile, regionIds, StandardCharsets.UTF_8);
+                if (!finish(cleanupId)) {
+                    return;
+                }
+                send(sender, () -> {
+                    for (String regionId : regionIds) {
+                        sender.sendMessage(ChatColor.YELLOW + "Found region " + regionId
+                                + " that can be deleted.");
+                    }
+                    sendFooter(sender, "preview");
+                    sender.sendMessage(ChatColor.YELLOW
+                            + "Dumped the list regions that can be deleted in "
+                            + previewFile.getFileName() + " (in the plugin folder).");
+                });
+            } catch (IOException exception) {
+                fail(sender, exception, cleanupId);
+            }
+        });
+    }
+
+    // Delete one region per tick to avoid loading all protection-block chunks at once.
+    private static void removeNext(
+            CommandSender sender,
+            Iterator<PSRegion> regions,
+            long cleanupId
+    ) {
+        if (!isActive(cleanupId)) {
+            return;
+        }
+        if (!regions.hasNext()) {
+            if (finish(cleanupId)) {
+                send(sender, () -> sendFooter(sender, "remove"));
+            }
+            return;
         }
 
-        // go to next region
-        regionLoop(deleteRegionsIterator, p, isRemoveOperation);
+        PSRegion region = regions.next();
+        ProtectionStones.getInstance().getTaskScheduler().runRegionDelayed(
+                region.getProtectBlockLocation(),
+                () -> {
+                    try {
+                        if (region.deleteRegion(true)) {
+                            send(sender, () -> sender.sendMessage(ChatColor.YELLOW
+                                    + "Removed region " + region.getId()
+                                    + " due to inactive owners."));
+                        }
+                    } catch (RuntimeException exception) {
+                        ProtectionStones.getPluginLogger().severe(
+                                "Failed to remove cleanup region " + region.getId()
+                                        + ": " + exception.getMessage());
+                    } finally {
+                        removeNext(sender, regions, cleanupId);
+                    }
+                },
+                1
+        );
+    }
+
+    private static void sendFooter(CommandSender sender, String operation) {
+        PSL.msg(sender, PSL.ADMIN_CLEANUP_FOOTER.msg().replace("%arg%", operation));
+    }
+
+    private static void send(CommandSender sender, Runnable action) {
+        ProtectionStones.getInstance().getTaskScheduler().runCommandSender(sender, action);
+    }
+
+    private static void fail(CommandSender sender, Exception exception, long cleanupId) {
+        if (!finish(cleanupId)) {
+            return;
+        }
+        ProtectionStones.getPluginLogger().severe(
+                "ProtectionStones cleanup failed: " + exception.getMessage());
+        exception.printStackTrace();
+        send(sender, () -> sender.sendMessage(
+                ChatColor.RED + "Internal error, please check the console logs."));
+    }
+
+    private static boolean isActive(long cleanupId) {
+        return CLEANUP_RUNNING.get() && CLEANUP_GENERATION.get() == cleanupId;
+    }
+
+    private static boolean finish(long cleanupId) {
+        if (CLEANUP_GENERATION.get() != cleanupId) {
+            return false;
+        }
+        return CLEANUP_RUNNING.compareAndSet(true, false);
+    }
+
+    public static void cancelActiveCleanup() {
+        CLEANUP_GENERATION.incrementAndGet();
+        CLEANUP_RUNNING.set(false);
     }
 }

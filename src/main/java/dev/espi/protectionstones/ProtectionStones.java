@@ -21,9 +21,13 @@ import com.electronwill.nightconfig.toml.TomlFormat;
 import com.sk89q.worldguard.protection.managers.RegionManager;
 import com.sk89q.worldguard.protection.regions.ProtectedRegion;
 import dev.espi.protectionstones.commands.ArgHelp;
+import dev.espi.protectionstones.commands.ArgAdminCleanup;
+import dev.espi.protectionstones.commands.ArgTp;
 import dev.espi.protectionstones.commands.PSCommandArg;
 import dev.espi.protectionstones.placeholders.PSPlaceholderExpansion;
+import dev.espi.protectionstones.scheduler.PlatformScheduler;
 import dev.espi.protectionstones.utils.BlockUtil;
+import dev.espi.protectionstones.utils.ParticlesUtil;
 import dev.espi.protectionstones.utils.RecipeUtil;
 import dev.espi.protectionstones.utils.upgrade.LegacyUpgrade;
 import dev.espi.protectionstones.utils.UUIDCache;
@@ -48,6 +52,9 @@ import net.luckperms.api.LuckPerms;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Logger;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -67,19 +74,21 @@ public class ProtectionStones extends JavaPlugin {
     public static File configLocation, blockDataFolder;
     public static CommentedFileConfig config;
 
-    private static List<PSCommandArg> commandArgs = new ArrayList<>();
+    private static final List<PSCommandArg> commandArgs = new CopyOnWriteArrayList<>();
     private static ProtectionStones plugin;
 
     private PSEconomy economy;
+    private PlatformScheduler taskScheduler;
 
     // all configuration file options are stored in here
-    private PSConfig configOptions;
-    static HashMap<String, PSProtectBlock> protectionStonesOptions = new HashMap<>();
+    private volatile PSConfig configOptions;
+    static volatile Map<String, PSProtectBlock> protectionStonesOptions = Map.of();
 
 
     // ps alias to id cache
     // <world-name, <alias, [ids]>>
-    static HashMap<UUID, HashMap<String, ArrayList<String>>> regionNameToID = new HashMap<>();
+    static volatile ConcurrentMap<UUID, ConcurrentMap<String, CopyOnWriteArrayList<String>>>
+            regionNameToID = new ConcurrentHashMap<>();
 
     // vault economy integration
     private boolean vaultSupportEnabled = false;
@@ -92,7 +101,7 @@ public class ProtectionStones extends JavaPlugin {
     private boolean placeholderAPISupportEnabled = false;
 
     // ps toggle/on/off list
-    public static Set<UUID> toggleList = new HashSet<>();
+    public static Set<UUID> toggleList = ConcurrentHashMap.newKeySet();
 
     /* ~~~~~~~~~~ Instance methods ~~~~~~~~~~~~ */
 
@@ -140,6 +149,10 @@ public class ProtectionStones extends JavaPlugin {
         return economy;
     }
 
+    public PlatformScheduler getTaskScheduler() {
+        return taskScheduler;
+    }
+
     public boolean isLuckPermsSupportEnabled() {
         return luckPermsSupportEnabled;
     }
@@ -184,6 +197,10 @@ public class ProtectionStones extends JavaPlugin {
      */
     public void setConfigOptions(PSConfig conf) {
         this.configOptions = conf;
+    }
+
+    static void replaceProtectionStonesOptions(Map<String, PSProtectBlock> options) {
+        protectionStonesOptions = Collections.unmodifiableMap(new LinkedHashMap<>(options));
     }
 
     /**
@@ -319,16 +336,14 @@ public class ProtectionStones extends JavaPlugin {
 
     public static boolean isPSNameAlreadyUsed(String name) {
         for (UUID worldUid : regionNameToID.keySet()) {
-            RegionManager rgm = WGUtils.getRegionManagerWithWorld(Bukkit.getWorld(worldUid));
+            World world = Bukkit.getWorld(worldUid);
+            if (world == null) continue;
+            RegionManager rgm = WGUtils.getRegionManagerWithWorld(world);
+            if (rgm == null) continue;
 
             List<String> l = regionNameToID.get(worldUid).get(name);
             if (l == null) continue;
-            for (int i = 0; i < l.size(); i++) { // remove outdated cache
-                if (rgm.getRegion(l.get(i)) == null) {
-                    l.remove(i);
-                    i--;
-                }
-            }
+            l.removeIf(regionId -> rgm.getRegion(regionId) == null);
             if (!l.isEmpty()) return true;
         }
         return false;
@@ -503,9 +518,12 @@ public class ProtectionStones extends JavaPlugin {
     }
 
     // called on first start, and /ps reload
-    public static void loadConfig(boolean isReload) {
-        // remove old ps crafting recipes
-        RecipeUtil.removePSRecipes();
+    public static synchronized void loadConfig(boolean isReload) {
+        if (isReload) {
+            ArgTp.cancelAllTeleports();
+            ArgAdminCleanup.cancelActiveCleanup();
+            ParticlesUtil.cancelAll();
+        }
 
         // init config
         PSConfig.initConfig();
@@ -555,6 +573,7 @@ public class ProtectionStones extends JavaPlugin {
         Config.setInsertionOrderPreserved(true); // make sure that config upgrades aren't a complete mess
 
         plugin = this;
+        taskScheduler = new PlatformScheduler(this);
         configLocation = new File(this.getDataFolder() + "/config.toml");
         blockDataFolder = new File(this.getDataFolder() + "/blocks");
 
@@ -572,6 +591,7 @@ public class ProtectionStones extends JavaPlugin {
         if (getServer().getPluginManager().getPlugin("WorldGuard") == null || !getServer().getPluginManager().getPlugin("WorldGuard").isEnabled()) {
             getLogger().severe("WorldGuard or WorldEdit not enabled! Disabling ProtectionStones...");
             getServer().getPluginManager().disablePlugin(this);
+            return;
         }
 
         // check if Vault is enabled (for economy support)
@@ -617,28 +637,28 @@ public class ProtectionStones extends JavaPlugin {
         // build up region cache
         getLogger().info("Building region cache...");
 
+        ConcurrentMap<UUID, ConcurrentMap<String, CopyOnWriteArrayList<String>>>
+                builtRegionNameCache = new ConcurrentHashMap<>();
         HashMap<World, RegionManager> regionManagers = WGUtils.getAllRegionManagers();
         for (World w : regionManagers.keySet()) {
             RegionManager rgm = regionManagers.get(w);
-            HashMap<String, ArrayList<String>> m = new HashMap<>();
+            ConcurrentMap<String, CopyOnWriteArrayList<String>> m = new ConcurrentHashMap<>();
             for (ProtectedRegion r : rgm.getRegions().values()) {
                 String name = r.getFlag(FlagHandler.PS_NAME);
                 if (isPSRegion(r) && name != null) {
-                    if (m.containsKey(name)) {
-                        m.get(name).add(r.getId());
-                    } else {
-                        m.put(name, new ArrayList<>(Collections.singletonList(r.getId())));
-                    }
+                    m.computeIfAbsent(name, ignored -> new CopyOnWriteArrayList<>()).add(r.getId());
                 }
             }
-            regionNameToID.put(w.getUID(), m);
+            builtRegionNameCache.put(w.getUID(), m);
         }
+        regionNameToID = builtRegionNameCache;
 
         // uuid cache
         getLogger().info("Building UUID cache... (if slow change async-load-uuid-cache in the config to true)");
         if (configOptions.asyncLoadUUIDCache) { // async load
-            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                for (OfflinePlayer op : Bukkit.getOfflinePlayers()) {
+            OfflinePlayer[] offlinePlayers = Bukkit.getOfflinePlayers();
+            taskScheduler.runAsync(() -> {
+                for (OfflinePlayer op : offlinePlayers) {
                     UUIDCache.storeUUIDNamePair(op.getUniqueId(), op.getName());
                 }
             });
@@ -659,6 +679,23 @@ public class ProtectionStones extends JavaPlugin {
             LegacyUpgrade.upgradeRegionsWithNegativeYValues();
 
         getLogger().info(ChatColor.WHITE + "ProtectionStones has successfully started!");
+    }
+
+    @Override
+    public void onDisable() {
+        if (economy != null) {
+            economy.stop();
+        }
+        ArgTp.cancelAllTeleports();
+        ArgAdminCleanup.cancelActiveCleanup();
+        ParticlesUtil.cancelAll();
+        if (taskScheduler != null) {
+            taskScheduler.shutdown();
+        }
+        if (config != null) {
+            config.close();
+            config = null;
+        }
     }
 
 }

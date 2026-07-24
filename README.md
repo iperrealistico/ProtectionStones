@@ -1,44 +1,66 @@
-![ProtectionStones](/logo.png?raw=true)
+# ProtectionStones PVC Fork
 
-[![Maven Central](https://img.shields.io/maven-central/v/dev.espi/protectionstones.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22dev.espi%22%20AND%20a:%22protectionstones%22)
-![Open issues](https://img.shields.io/github/issues-raw/espidev/ProtectionStones)
-![Closed issues](https://img.shields.io/github/issues-closed-raw/espidev/ProtectionStones)
+This repository maintains a compatibility-focused fork of
+[espidev/ProtectionStones](https://github.com/espidev/ProtectionStones).
+It preserves the upstream command, configuration, data, API, event, and
+integration contracts while centralizing Paper/Purpur and Folia scheduling.
 
-[Spigot](https://www.spigotmc.org/resources/protectionstones-updated-for-1-13-1-16-wg7.61797/) | [Permissions](https://espidev.gitbook.io/protectionstones/permissions) | [Commands](https://espidev.gitbook.io/protectionstones/commands) | [Configuration](https://espidev.gitbook.io/protectionstones/configuration) | [Placeholders](https://espidev.gitbook.io/protectionstones/placeholders) | [Translations](https://espidev.gitbook.io/protectionstones/translations) | [API Information](https://espidev.gitbook.io/protectionstones/api) | [Javadocs](https://jdps.espi.dev/) | [Dev Builds](https://ci.espi.dev/job/ProtectionStones/)
+The current fork line is `2.10.6-pvc.1`, based on upstream commit
+`89be4aeab1f00422ad060e797660e56f32e1aaf0`.
 
-Get support for the plugin on the M.O.S.S. Discord! https://discord.gg/cqM96tcJRx
+## Runtime Contract
 
-ProtectionStones is a grief prevention and land claiming plugin.
+The release target is one Java 21 bytecode JAR for:
 
-This plugin uses a specified type of minecraft block/blocks as a protection block. When a player placed a block of that type, they are able to protect a region around them. The size of the protected region is configurable in the plugins config file. You can also set which flags players can change and also the default flags to be set when a new region is created.
+- Purpur 1.21.10 on Java 21
+- Purpur 26.2 on Java 25
+- Folia 1.21.10 on Java 21
+- Folia 26.2 on Java 25
 
-View the Spigot page (with FAQ and install instructions) [here](https://www.spigotmc.org/resources/protectionstones-updated-for-1-13-1-16-wg7.61797/).
+WorldEdit and WorldGuard are required and are not bundled. Vault,
+PlaceholderAPI, and LuckPerms remain optional. See
+[docs/compatibility-matrix.md](docs/compatibility-matrix.md) for exact builds
+and current verification status. Do not infer support for a lane marked
+`BLOCKED` or `NOT TESTED`.
 
-Check the [wiki](https://github.com/espidev/ProtectionStones/wiki) for plugin reference information.
+## Installation
 
-### Dependencies
-* ProtectionStones 2.10.6
-  * Spigot 1.21.6+
-  * WorldGuard 7.0.9+
-  * WorldEdit 7.2.6+
-  * Vault (Optional)
-  * PlaceholderAPI (Optional)
-  * LuckPerms (Optional)
+1. Install the WorldEdit and WorldGuard builds specified for the server lane.
+2. Put the verified `ProtectionStones-2.10.6-pvc.1.jar` in `plugins/`.
+3. Start the server and configure `plugins/ProtectionStones/config.toml` and
+   `plugins/ProtectionStones/blocks/*.toml`.
 
-### Building
-Make sure you have the Java 21 JDK installed, as well as Maven.
+Existing upstream `2.10.6` configuration and WorldGuard region data are kept in
+their original formats. A local migration test preserves config, block,
+messages, owners, members, flags, priority, home, and sale state through two
+candidate restarts. Always back up server data before changing server or
+dependency versions.
 
+## Build
+
+Use JDK 21 or newer:
+
+```powershell
+.\mvnw.cmd clean verify
 ```
-git clone https://github.com/espidev/ProtectionStones.git
-cd ProtectionStones
-mvn clean install
-```
 
-Compiling ProtectionStones will also produce a jar with JavaDocs, which can be useful if you need documentation for an older version.
+The main artifact is
+`target/ProtectionStones-2.10.6-pvc.1.jar`. Automated tests also enforce the
+scheduler boundary and Java 21 release setting.
 
-### Usage Statistics
-<img src="https://bstats.org/signatures/bukkit/protectionstones.svg">
+## Maintenance
 
-View full usage statistics [here](https://bstats.org/plugin/bukkit/ProtectionStones/4071).
+- [Architecture](docs/architecture.md)
+- [Folia threading model](docs/folia-threading-model.md)
+- [Feature inventory](docs/feature-inventory.md)
+- [Testing](docs/testing.md)
+- [Upstream synchronization](docs/upstream-sync.md)
+- [Release checklist](docs/release-checklist.md)
 
-This plugin is licensed under the **GPLv3**, as is required by Bukkit plugins.
+Workspace agents must begin with the workspace-level
+`.ai-control/START-HERE.local.md`; fork documentation does not duplicate that
+control plane.
+
+Upstream user documentation remains available through the
+[ProtectionStones wiki](https://github.com/espidev/ProtectionStones/wiki).
+This GPLv3 fork preserves the upstream license and attribution.

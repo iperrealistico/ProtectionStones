@@ -18,13 +18,13 @@ package dev.espi.protectionstones.utils;
 import com.sk89q.worldguard.WorldGuard;
 import com.sk89q.worldguard.util.profile.Profile;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class UUIDCache {
-    private static Map<UUID, String> uuidToName = new HashMap<>();
-    private static Map<String, UUID> nameToUUID = new HashMap<>();
+    private static final Map<UUID, String> uuidToName = new ConcurrentHashMap<>();
+    private static final Map<String, UUID> nameToUUID = new ConcurrentHashMap<>();
 
     // toLowerCase for case insensitive search
 

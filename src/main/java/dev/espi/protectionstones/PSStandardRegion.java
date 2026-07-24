@@ -31,6 +31,8 @@ import org.bukkit.entity.Player;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -61,20 +63,27 @@ public class PSStandardRegion extends PSRegion {
 
     @Override
     public void setName(String name) {
-        HashMap<String, ArrayList<String>> m = ProtectionStones.regionNameToID.get(getWorld().getUID());
-        if (m == null) { // if the world has not been added
-            ProtectionStones.regionNameToID.put(getWorld().getUID(), new HashMap<>());
-            m = ProtectionStones.regionNameToID.get(getWorld().getUID());
-        }
-        if (m.get(getName()) != null) {
-            m.get(getName()).remove(getId());
+        ConcurrentMap<String, CopyOnWriteArrayList<String>> names =
+                ProtectionStones.regionNameToID.computeIfAbsent(
+                        getWorld().getUID(),
+                        ignored -> new java.util.concurrent.ConcurrentHashMap<>()
+                );
+        String oldName = getName();
+        if (oldName != null) {
+            names.computeIfPresent(oldName, (ignored, ids) -> {
+                ids.remove(getId());
+                return ids.isEmpty() ? null : ids;
+            });
         }
         if (name != null) {
-            if (m.containsKey(name)) {
-                m.get(name).add(getId());
-            } else {
-                m.put(name, new ArrayList<>(Collections.singletonList(getId())));
-            }
+            names.compute(name, (ignored, ids) -> {
+                CopyOnWriteArrayList<String> updated =
+                        ids == null ? new CopyOnWriteArrayList<>() : ids;
+                if (!updated.contains(getId())) {
+                    updated.add(getId());
+                }
+                return updated;
+            });
         }
         wgregion.setFlag(FlagHandler.PS_NAME, name);
     }
@@ -509,13 +518,13 @@ public class PSStandardRegion extends PSRegion {
 
         // remove name from cache
         if (getName() != null) {
-            HashMap<String, ArrayList<String>> rIds = ProtectionStones.regionNameToID.get(getWorld().getUID());
-            if (rIds != null && rIds.containsKey(getName())) {
-                if (rIds.get(getName()).size() == 1) {
-                    rIds.remove(getName());
-                } else {
-                    rIds.get(getName()).remove(getId());
-                }
+            ConcurrentMap<String, CopyOnWriteArrayList<String>> names =
+                    ProtectionStones.regionNameToID.get(getWorld().getUID());
+            if (names != null) {
+                names.computeIfPresent(getName(), (ignored, ids) -> {
+                    ids.remove(getId());
+                    return ids.isEmpty() ? null : ids;
+                });
             }
         }
 

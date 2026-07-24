@@ -1,0 +1,14 @@
+name: ProtectionStonesRuntimeProbe
+version: 1.0.0
+main: club.peacefulvanilla.protectionstonesprobe.ProtectionStonesRuntimeProbe
+api-version: "1.21.10"
+folia-supported: true
+depend:
+  - ProtectionStones
+commands:
+  psprobe:
+    description: Runs isolated ProtectionStones runtime assertions.
+    permission: protectionstones.runtimeprobe
+permissions:
+  protectionstones.runtimeprobe:
+    default: op

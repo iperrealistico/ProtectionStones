@@ -104,7 +104,7 @@ public class ArgTax implements PSCommandArg {
 
     public boolean taxInfo(String[] args, HashMap<String, String> flags, PSPlayer p) {
         if (args.length == 2) { // /ps tax info
-            Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+            ProtectionStones.getInstance().getTaskScheduler().runEntity(p.getPlayer(), () -> {
                 int pageNum = (flags.get("-p") == null || !MiscUtil.isValidInteger(flags.get("-p")) ? 0 : Integer.parseInt(flags.get("-p"))-1);
 
                 List<TextComponent> entries = new ArrayList<>();

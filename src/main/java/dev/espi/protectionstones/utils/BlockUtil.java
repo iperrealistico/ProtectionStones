@@ -38,7 +38,7 @@ import java.util.UUID;
 
 public class BlockUtil {
     static final int MAX_USERNAME_LENGTH = 16;
-    public static HashMap<String, String> uuidToBase64Head = new HashMap<>();
+    public static volatile HashMap<String, String> uuidToBase64Head = new HashMap<>();
 
     public static ItemStack getProtectBlockItemFromType(String type) {
         if (type.startsWith(Material.PLAYER_HEAD.toString())) {

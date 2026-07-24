@@ -34,19 +34,22 @@ import java.util.List;
 
 public class RecipeUtil {
 
-    private static List<NamespacedKey> recipes = new ArrayList<>();
+    private static volatile List<NamespacedKey> recipes = List.of();
+
     public static void setupPSRecipes() {
+        List<NamespacedKey> loadedRecipes = new ArrayList<>();
         for (PSProtectBlock b : ProtectionStones.getInstance().getConfiguredBlocks()) {
             // add custom recipes to Bukkit
             if (b.allowCraftWithCustomRecipe) {
                 try {
                     Bukkit.addRecipe(parseRecipe(b));
-                    recipes.add(getNamespacedKeyForBlock(b));
+                    loadedRecipes.add(getNamespacedKeyForBlock(b));
                 } catch (IllegalStateException e) {
                     ProtectionStones.getPluginLogger().warning("Reloading custom recipes does not work right now, you have to restart the server for updated recipes.");
                 }
             }
         }
+        recipes = List.copyOf(loadedRecipes);
     }
     public static void removePSRecipes() {
         // remove previous protectionstones recipes (/ps reload)
@@ -60,7 +63,7 @@ public class RecipeUtil {
             } catch (Exception ignored) {
             }
         }
-        recipes.clear();
+        recipes = List.of();
     }
 
     public static List<NamespacedKey> getRecipeKeys() {

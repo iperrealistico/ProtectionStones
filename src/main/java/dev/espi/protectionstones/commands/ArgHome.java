@@ -30,11 +30,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.StringUtil;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class ArgHome implements PSCommandArg {
 
-    private static HashMap<UUID, List<String>> tabCache = new HashMap<>();
+    private static final ConcurrentMap<UUID, List<String>> tabCache = new ConcurrentHashMap<>();
 
     @Override
     public List<String> getNames() {
@@ -80,9 +83,11 @@ public class ArgHome implements PSCommandArg {
                 // cache home regions
                 tabCache.put(p.getUniqueId(), regionNames);
 
-                Bukkit.getScheduler().runTaskLater(ProtectionStones.getInstance(), () -> {
-                    tabCache.remove(p.getUniqueId());
-                }, 200); // remove cache after 10 seconds
+                ProtectionStones.getInstance().getTaskScheduler().runAsyncDelayed(
+                        () -> tabCache.remove(p.getUniqueId()),
+                        10,
+                        TimeUnit.SECONDS
+                );
             }
 
             return StringUtil.copyPartialMatches(args[1], tabCache.get(p.getUniqueId()), new ArrayList<>());
@@ -128,7 +133,7 @@ public class ArgHome implements PSCommandArg {
         if (args.length != 2 && args.length != 1)
             return PSL.msg(p, PSL.HOME_HELP.msg());
 
-        Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+        ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () -> {
             PSPlayer psp = PSPlayer.fromPlayer(p);
             if (args.length == 1) {
                 // just "/ps home"

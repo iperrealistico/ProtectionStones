@@ -16,32 +16,60 @@
 package dev.espi.protectionstones.utils;
 
 import dev.espi.protectionstones.ProtectionStones;
-import org.bukkit.Bukkit;
+import dev.espi.protectionstones.scheduler.TaskHandle;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+
 public class ParticlesUtil {
+    private static final Set<TaskHandle> ACTIVE_TASKS = ConcurrentHashMap.newKeySet();
+
     public static void persistRedstoneParticle(Player p, Location l, Particle.DustOptions d, int occ) {
         for (int i = 0; i < occ; i++) {
-            Bukkit.getScheduler().runTaskLater(ProtectionStones.getInstance(), () -> {
-                if (!p.isOnline()) return;
+            AtomicReference<TaskHandle> taskReference = new AtomicReference<>();
+            Runnable removeTask = () -> {
+                TaskHandle task = taskReference.get();
+                if (task != null) {
+                    ACTIVE_TASKS.remove(task);
+                }
+            };
+            TaskHandle task = ProtectionStones.getInstance().getTaskScheduler().runEntityDelayed(p, () -> {
+                try {
+                    if (!p.isOnline()) return;
 
-                // Stronger "glow marker" burst
-                p.spawnParticle(Particle.DUST, l,
-                        2,            // count (was 1)
-                        0.10, 0.15, 0.10, // offset/spread (x,y,z)
-                        0.0,
-                        d
-                );
+                    // Stronger "glow marker" burst
+                    p.spawnParticle(Particle.DUST, l,
+                            2,
+                            0.10, 0.15, 0.10,
+                            0.0,
+                            d
+                    );
 
-                p.spawnParticle(Particle.GLOW, l,
-                        2,
-                        0.05, 0.08, 0.05,
-                        0.0
-                );
+                    p.spawnParticle(Particle.GLOW, l,
+                            2,
+                            0.05, 0.08, 0.05,
+                            0.0
+                    );
+                } finally {
+                    removeTask.run();
+                }
 
-            }, i * 20L);
+            }, removeTask, Math.max(1, i * 20L));
+            taskReference.set(task);
+            if (!task.isDone()) {
+                ACTIVE_TASKS.add(task);
+            }
         }
+    }
+
+    public static void cancelAll() {
+        for (TaskHandle task : ACTIVE_TASKS.toArray(TaskHandle[]::new)) {
+            task.cancel();
+        }
+        ACTIVE_TASKS.clear();
     }
 }

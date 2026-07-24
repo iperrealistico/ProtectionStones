@@ -41,22 +41,26 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class BlockHandler {
-    private static HashMap<Player, Double> lastProtectStonePlaced = new HashMap<>();
+    private static final ConcurrentMap<UUID, Double> lastProtectStonePlaced = new ConcurrentHashMap<>();
 
     private static String checkCooldown(Player p) {
         double currentTime = System.currentTimeMillis();
-        if (lastProtectStonePlaced.containsKey(p)) {
+        UUID playerId = p.getUniqueId();
+        if (lastProtectStonePlaced.containsKey(playerId)) {
             double cooldown = ProtectionStones.getInstance().getConfigOptions().placingCooldown; // seconds
-            double lastPlace = lastProtectStonePlaced.get(p); // milliseconds
+            double lastPlace = lastProtectStonePlaced.get(playerId); // milliseconds
 
             if (lastPlace + cooldown * 1000 > currentTime) { // if cooldown has not been finished
                 return String.format("%.1f", cooldown - ((currentTime - lastPlace) / 1000));
             }
-            lastProtectStonePlaced.remove(p);
+            lastProtectStonePlaced.remove(playerId, lastPlace);
         }
-        lastProtectStonePlaced.put(p, currentTime);
+        lastProtectStonePlaced.put(playerId, currentTime);
         return null;
     }
 
@@ -275,7 +279,8 @@ public class BlockHandler {
         if (blockOptions.autoHide) {
             PSL.msg(p, PSL.REGION_HIDDEN.msg());
             // run on next tick so placing tile entities don't complain
-            Bukkit.getScheduler().runTask(ProtectionStones.getInstance(), () -> l.getBlock().setType(Material.AIR));
+            ProtectionStones.getInstance().getTaskScheduler()
+                    .runRegionDelayed(l, () -> l.getBlock().setType(Material.AIR), 1);
         }
 
         if (blockOptions.startWithTaxAutopay) {
@@ -312,12 +317,16 @@ public class BlockHandler {
             // actually do auto merge
             if (!showGUI) {
                 PSRegion finalMergeTo = mergeTo;
-                Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+                World world = p.getWorld();
+                ProtectionStones.getInstance().getTaskScheduler().runGlobal(() -> {
                     try {
-                        WGMerge.mergeRealRegions(p.getWorld(), r.getWGRegionManager(), finalMergeTo, Arrays.asList(finalMergeTo, r));
-                        PSL.msg(p, PSL.MERGE_AUTO_MERGED.msg().replace("%region%", finalMergeTo.getId()));
+                        WGMerge.mergeRealRegions(world, r.getWGRegionManager(), finalMergeTo, Arrays.asList(finalMergeTo, r));
+                        ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () ->
+                                PSL.msg(p, PSL.MERGE_AUTO_MERGED.msg()
+                                        .replace("%region%", finalMergeTo.getId())));
                     } catch (WGMerge.RegionHoleException e) {
-                        PSL.msg(p, PSL.NO_REGION_HOLES.msg()); // TODO github issue #120, prevent holes even if showGUI is true
+                        ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () ->
+                                PSL.msg(p, PSL.NO_REGION_HOLES.msg()));
                     } catch (WGMerge.RegionCannotMergeWhileRentedException e) {
                         // don't need to tell player that you can't merge
                     }

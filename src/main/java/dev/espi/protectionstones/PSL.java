@@ -387,8 +387,8 @@ public enum PSL {
 
     private final String[] placeholders;
     private final int placeholdersCount;
-    private String message;
-    private boolean isEmpty;
+    private volatile String message;
+    private volatile boolean isEmpty;
 
     private static final File conf = new File(ProtectionStones.getInstance().getDataFolder(), "messages.yml");
 
@@ -412,12 +412,13 @@ public enum PSL {
 
     @Nullable
     public String format(final Object... args) {
-        if (isEmpty) {
+        String currentMessage = this.message;
+        if (currentMessage.isEmpty()) {
             return null;
         }
 
         if (this.placeholdersCount == 0) {
-            return this.message;
+            return currentMessage;
         }
 
         if (this.placeholdersCount != args.length) {
@@ -425,7 +426,7 @@ public enum PSL {
         }
 
         return StringUtils.replaceEach(
-                this.message,
+                currentMessage,
                 this.placeholders,
                 Arrays.stream(args).filter(Objects::nonNull).map(Object::toString).toArray(String[]::new)
         );

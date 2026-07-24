@@ -1,0 +1,13 @@
+{
+  "name": "protectionstones-local-mineflayer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "mineflayer": "4.34.0",
+    "vec3": "0.1.10"
+  }
+}

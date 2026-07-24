@@ -67,7 +67,8 @@ public class ListenerClass implements Listener {
         UUIDCache.storeUUIDNamePair(p.getUniqueId(), p.getName());
 
         // allow worldguard to resolve all UUIDs to names
-        Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> UUIDCache.storeWGProfile(p.getUniqueId(), p.getName()));
+        ProtectionStones.getInstance().getTaskScheduler()
+                .runAsync(() -> UUIDCache.storeWGProfile(p.getUniqueId(), p.getName()));
 
         // add recipes to player's recipe book
         p.discoverRecipes(RecipeUtil.getRecipeKeys());
@@ -81,7 +82,7 @@ public class ListenerClass implements Listener {
 
         // tax join message
         if (ProtectionStones.getInstance().getConfigOptions().taxEnabled && ProtectionStones.getInstance().getConfigOptions().taxMessageOnJoin) {
-            Bukkit.getScheduler().runTaskAsynchronously(ProtectionStones.getInstance(), () -> {
+            ProtectionStones.getInstance().getTaskScheduler().runGlobal(() -> {
                 int amount = 0;
                 for (PSRegion psr : psp.getTaxEligibleRegions()) {
                     for (PSRegion.TaxPayment tp : psr.getTaxPaymentsDue()) {
@@ -90,7 +91,10 @@ public class ListenerClass implements Listener {
                 }
 
                 if (amount != 0) {
-                    PSL.msg(psp, PSL.TAX_JOIN_MSG_PENDING_PAYMENTS.msg().replace("%money%", "" + amount));
+                    int paymentAmount = amount;
+                    ProtectionStones.getInstance().getTaskScheduler().runEntity(p, () ->
+                            PSL.msg(psp, PSL.TAX_JOIN_MSG_PENDING_PAYMENTS.msg()
+                                    .replace("%money%", String.valueOf(paymentAmount))));
                 }
             });
         }
@@ -540,37 +544,48 @@ public class ListenerClass implements Listener {
 
         // split action_type: action
         String[] sp = action.split(": ");
-        if (sp.length == 0) return;
+        if (sp.length < 2) return;
 
         StringBuilder act = new StringBuilder(sp[1]);
         for (int i = 2; i < sp.length; i++) act.append(": ").append(sp[i]); // add anything extra that has a colon
 
+        var protectBlockLocation = region.getProtectBlockLocation();
         act = new StringBuilder(act.toString()
                 .replace("%player%", player)
                 .replace("%world%", region.getWorld().getName())
                 .replace("%region%", region.getName() == null ? region.getId() : region.getName() + " (" + region.getId() + ")")
-                .replace("%block_x%", region.getProtectBlock().getX() + "")
-                .replace("%block_y%", region.getProtectBlock().getY() + "")
-                .replace("%block_z%", region.getProtectBlock().getZ() + ""));
+                .replace("%block_x%", String.valueOf(protectBlockLocation.getBlockX()))
+                .replace("%block_y%", String.valueOf(protectBlockLocation.getBlockY()))
+                .replace("%block_z%", String.valueOf(protectBlockLocation.getBlockZ())));
 
+        String renderedAction = act.toString();
         switch (sp[0]) {
             case "player_command":
-                if (s != null) Bukkit.getServer().dispatchCommand(s, act.toString());
+                if (s != null)
+                    ProtectionStones.getInstance().getTaskScheduler().runCommandSender(s,
+                            () -> Bukkit.getServer().dispatchCommand(s, renderedAction));
                 break;
             case "console_command":
-                Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), act.toString());
+                ProtectionStones.getInstance().getTaskScheduler().runGlobal(() ->
+                        Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), renderedAction));
                 break;
             case "message":
-                if (s != null) s.sendMessage(ChatColor.translateAlternateColorCodes('&', act.toString()));
+                if (s != null)
+                    ProtectionStones.getInstance().getTaskScheduler().runCommandSender(s, () ->
+                            s.sendMessage(ChatColor.translateAlternateColorCodes('&', renderedAction)));
                 break;
             case "global_message":
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    p.sendMessage(ChatColor.translateAlternateColorCodes('&', act.toString()));
-                }
-                ProtectionStones.getPluginLogger().info(ChatColor.translateAlternateColorCodes('&', act.toString()));
+                String message = ChatColor.translateAlternateColorCodes('&', renderedAction);
+                ProtectionStones.getInstance().getTaskScheduler().runGlobal(() -> {
+                    for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
+                        ProtectionStones.getInstance().getTaskScheduler().runEntity(onlinePlayer,
+                                () -> onlinePlayer.sendMessage(message));
+                    }
+                    ProtectionStones.getPluginLogger().info(message);
+                });
                 break;
             case "console_message":
-                ProtectionStones.getPluginLogger().info(ChatColor.translateAlternateColorCodes('&', act.toString()));
+                ProtectionStones.getPluginLogger().info(ChatColor.translateAlternateColorCodes('&', renderedAction));
                 break;
         }
     }
@@ -581,12 +596,13 @@ public class ListenerClass implements Listener {
         if (!event.getRegion().getTypeOptions().eventsEnabled) return;
 
         // run on next tick (after the region is created to allow for edits to the region)
-        Bukkit.getServer().getScheduler().runTask(ProtectionStones.getInstance(), () -> {
+        ProtectionStones.getInstance().getTaskScheduler()
+                .runRegionDelayed(event.getRegion().getProtectBlockLocation(), () -> {
             // run custom commands (in config)
             for (String action : event.getRegion().getTypeOptions().regionCreateCommands) {
                 execEvent(action, event.getPlayer(), event.getPlayer().getName(), event.getRegion());
             }
-        });
+        }, 1);
     }
 
     @EventHandler
